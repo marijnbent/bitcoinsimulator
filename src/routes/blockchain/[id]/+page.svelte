@@ -180,6 +180,7 @@
 			const newBlock = {
 				minerId: user.id,
 				nonce,
+				hash: currentHash,
 				previousHash: selectedPreviousBlock.hash,
 				transactionIds: selectedTransactions.map(tx => tx.id)
 			};
@@ -530,10 +531,6 @@
 								</div>
 							{/each}
 						</div>
-						
-						<div class="mt-4 text-sm text-cyan-500">
-							Selected: {selectedTransactions.length} transactions
-						</div>
 					{/if}
 				</div>
 				
@@ -589,6 +586,8 @@
 						</div>
 						<span class="text-xs">Target: {blockchain.leadingZeros} leading zeros</span>
 					</div>
+
+					Selected: {selectedTransactions.length} transactions
 					
 					<!-- Generated Hashes -->
 					{#if generatedHashes.length > 0}

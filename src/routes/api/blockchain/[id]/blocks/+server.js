@@ -8,21 +8,21 @@ import { calculateBlockHash, isValidHash } from '$lib/utils/crypto.js';
 export async function GET({ params }) {
   try {
     const { id } = params;
-    
+
     // Get the blockchain from the database
     const blockchains = await db.select().from(blockchain).where(eq(blockchain.id, id));
-    
+
     // Check if the blockchain exists
     if (blockchains.length === 0) {
       return json({ error: 'Blockchain not found' }, { status: 404 });
     }
-    
+
     // Get all blocks for the blockchain
     const blocks = await db.select().from(block).where(eq(block.blockchainId, id));
-    
+
     // Get all transactions for the blocks
     const transactions = await db.select().from(transaction).where(eq(transaction.blockchainId, id));
-    
+
     // Group transactions by block
     const blockTransactions = {};
     for (const tx of transactions) {
@@ -33,13 +33,13 @@ export async function GET({ params }) {
         blockTransactions[tx.blockId].push(tx);
       }
     }
-    
+
     // Add transactions to blocks
     const blocksWithTransactions = blocks.map(b => ({
       ...b,
       transactions: blockTransactions[b.id] || []
     }));
-    
+
     return json(blocksWithTransactions);
   } catch (error) {
     console.error('Error fetching blocks:', error);
@@ -53,37 +53,56 @@ export async function POST({ params, request }) {
     const { id } = params;
     const data = await request.json();
     console.log('Received data:', data);
-    
+
     // Validate required fields
     if (!data.minerId) {
       console.log('Error: Miner ID is required');
       return json({ error: 'Miner ID is required' }, { status: 400 });
     }
-    
+
     if (!data.nonce && data.nonce !== 0) {
       console.log('Error: Nonce is required');
       return json({ error: 'Nonce is required' }, { status: 400 });
     }
-    
+
     // Get the blockchain from the database
     const blockchains = await db.select().from(blockchain).where(eq(blockchain.id, id));
-    
+
     // Check if the blockchain exists
     if (blockchains.length === 0) {
       return json({ error: 'Blockchain not found' }, { status: 404 });
     }
-    
+
     const currentBlockchain = blockchains[0];
-    
+
+     // Validate the hash (only if there are transactions)
+     if (!isValidHash(data.hash, currentBlockchain.leadingZeros)) {
+      return json({ error: 'Invalid hash' }, { status: 400 });
+    }
+
     // Get the latest block
     const blocks = await db.select()
       .from(block)
       .where(eq(block.blockchainId, id))
       .orderBy(block.minedAt, 'desc')
       .limit(1);
-    
-    const previousBlock = blocks.length > 0 ? blocks[0] : null;
-    const previousHash = previousBlock ? previousBlock.hash : '0000000000000000000000000000000000000000000000000000000000000000';
+
+    // Find the block with matching hash to data.previousHash
+    const previousBlock = await db.select()
+      .from(block)
+      .where(
+        and(
+          eq(block.blockchainId, id),
+          eq(block.hash, data.previousHash)
+        )
+      )
+      .limit(1);
+
+    if (previousBlock.length === 0) {
+      return json({ error: 'Previous block not found' }, { status: 400 });
+    }
+
+    const previousHash = previousBlock[0].hash;
     
     // Get transactions from mempool
     const mempoolTransactions = await db.select()
@@ -94,17 +113,17 @@ export async function POST({ params, request }) {
           eq(transaction.inMempool, true)
         )
       );
-    
+
     // Filter transactions to include in the block
     const transactionIds = data.transactionIds || [];
     console.log('Transaction IDs:', transactionIds);
-    
+
     const includedTransactions = mempoolTransactions.filter(tx => {
       const include = transactionIds.includes(tx.id);
       console.log(`Transaction ${tx.id} included: ${include}`);
       return include;
     });
-    
+
     // Create a new block
     const timestamp = Date.now();
     const newBlock = {
@@ -114,26 +133,12 @@ export async function POST({ params, request }) {
       minerId: data.minerId,
       nonce: data.nonce,
       minedAt: timestamp,
-      hash: '' // Will be calculated
+      hash: data.hash
     };
-    
-    // Calculate the hash
-    const hash = calculateBlockHash(
-      { ...newBlock, minedAt: timestamp },
-      includedTransactions
-    );
-    
-    // Validate the hash (only if there are transactions)
-    if (includedTransactions.length > 0 && !isValidHash(hash, currentBlockchain.leadingZeros)) {
-      return json({ error: 'Invalid hash' }, { status: 400 });
-    }
-    
-    // Set the hash
-    newBlock.hash = hash;
-    
+
     // Insert the block into the database
     await db.insert(block).values(newBlock);
-    
+
     // Update transactions to include them in the block
     for (const tx of includedTransactions) {
       await db.update(transaction)
@@ -143,7 +148,7 @@ export async function POST({ params, request }) {
         })
         .where(eq(transaction.id, tx.id));
     }
-    
+
     // Return the new block with transactions
     return json({
       ...newBlock,
