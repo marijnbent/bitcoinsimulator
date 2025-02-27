@@ -18,7 +18,7 @@
             |
 
 
-            <a show.bind="!state.page.explanation && !state.page.erklärung" class="has-text-info is-size-7 has-text-weight-semibold"
+            <a class="has-text-info is-size-7 has-text-weight-semibold"
                click.delegate="routeTutorial()">
               ${state.t.app.n1[state.l]}
             </a>
@@ -40,7 +40,7 @@
       </div>
 
 
-      <div show.bind="!state.page.explanation && !state.page.erklärung" class="has-text-weight-semibold" style="font-size: 12px; color: black; padding: 0.5rem 0.75rem 0 0.75rem;">
+      <div class="has-text-weight-semibold" style="font-size: 12px; color: black; padding: 0.5rem 0.75rem 0 0.75rem;">
         ${state.t.app.reminder[state.l]}
       </div>
 
@@ -205,7 +205,7 @@
       <iframe src="https://www.youtube.com/embed/JAaHgrIt8sE" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
   </div> -->
 
-  <div show.bind="state.privateKey && !state.page.explanation && !state.page.erklärung" class="p-75" style="border-top:1px solid lightgrey;">
+  <div show.bind="state.privateKey" class="p-75" style="border-top:1px solid lightgrey;">
 
     <div class="label">
       Wallets Online
