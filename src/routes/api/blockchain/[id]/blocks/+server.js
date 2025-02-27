@@ -52,13 +52,16 @@ export async function POST({ params, request }) {
   try {
     const { id } = params;
     const data = await request.json();
+    console.log('Received data:', data);
     
     // Validate required fields
     if (!data.minerId) {
+      console.log('Error: Miner ID is required');
       return json({ error: 'Miner ID is required' }, { status: 400 });
     }
     
     if (!data.nonce && data.nonce !== 0) {
+      console.log('Error: Nonce is required');
       return json({ error: 'Nonce is required' }, { status: 400 });
     }
     
@@ -94,9 +97,13 @@ export async function POST({ params, request }) {
     
     // Filter transactions to include in the block
     const transactionIds = data.transactionIds || [];
-    const includedTransactions = mempoolTransactions.filter(tx => 
-      transactionIds.includes(tx.id)
-    );
+    console.log('Transaction IDs:', transactionIds);
+    
+    const includedTransactions = mempoolTransactions.filter(tx => {
+      const include = transactionIds.includes(tx.id);
+      console.log(`Transaction ${tx.id} included: ${include}`);
+      return include;
+    });
     
     // Create a new block
     const timestamp = Date.now();
@@ -116,8 +123,8 @@ export async function POST({ params, request }) {
       includedTransactions
     );
     
-    // Validate the hash
-    if (!isValidHash(hash, currentBlockchain.leadingZeros)) {
+    // Validate the hash (only if there are transactions)
+    if (includedTransactions.length > 0 && !isValidHash(hash, currentBlockchain.leadingZeros)) {
       return json({ error: 'Invalid hash' }, { status: 400 });
     }
     
