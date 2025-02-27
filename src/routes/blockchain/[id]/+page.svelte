@@ -12,6 +12,7 @@
 	// State
 	let blockchain = $state(null);
 	let blocks = $state([]);
+	let blockTree = $state([]); // Organized blocks with height and fork information
 	let mempool = $state([]);
 	let user = $state(null);
 	let isLoading = $state(true);
@@ -32,6 +33,16 @@
 	let generatedHashes = $state([]);
 	const maxHashesToShow = 5;
 	
+	// State for controlling fork display
+	let showAllForks = $state(false);
+	
+	// Build the block tree structure when blocks are loaded or updated
+	$effect(() => {
+		if (blocks.length > 0) {
+			buildBlockTree();
+		}
+	});
+	
 	// Set the latest block as the default previous block when blocks are loaded
 	$effect(() => {
 		if (blocks.length > 0 && !selectedPreviousBlock) {
@@ -43,12 +54,122 @@
 		}
 	});
 	
+	// Function to build the block tree structure with heights and forks
+	function buildBlockTree() {
+		// Create a map of blocks by hash for quick lookup
+		const blocksByHash = {};
+		blocks.forEach(block => {
+			blocksByHash[block.hash] = { ...block, children: [], height: -1 };
+		});
+		
+		// Find the genesis block (the one with no previous hash or self-referential)
+		let genesisBlock = blocks.find(block => !block.previousHash || block.previousHash === block.hash);
+		
+		if (!genesisBlock && blocks.length > 0) {
+			// If no genesis block found, use the oldest block as genesis
+			genesisBlock = blocks.reduce(
+				(oldest, block) => (block.minedAt < oldest.minedAt ? block : oldest),
+				blocks[0]
+			);
+		}
+		
+		// If no blocks, return empty tree
+		if (!genesisBlock) {
+			blockTree = [];
+			return;
+		}
+		
+		// Build the tree structure by connecting blocks through previousHash
+		blocks.forEach(block => {
+			if (block.hash !== genesisBlock.hash && block.previousHash && blocksByHash[block.previousHash]) {
+				blocksByHash[block.previousHash].children.push(blocksByHash[block.hash]);
+			}
+		});
+		
+		// Assign heights using BFS traversal
+		const queue = [{ block: blocksByHash[genesisBlock.hash], height: 0 }];
+		const processed = new Set();
+		
+		while (queue.length > 0) {
+			const { block, height } = queue.shift();
+			
+			// Skip if already processed with a lower height
+			if (processed.has(block.hash) && block.height <= height) {
+				continue;
+			}
+			
+			// Assign height and mark as processed
+			block.height = height;
+			processed.add(block.hash);
+			
+			// Add children to queue
+			block.children.forEach(child => {
+				queue.push({ block: child, height: height + 1 });
+			});
+		}
+		
+		// Convert to array and sort by height (descending) and then by minedAt (descending)
+		const flatTree = Object.values(blocksByHash);
+		flatTree.sort((a, b) => {
+			if (b.height !== a.height) return b.height - a.height; // Newest blocks first
+			return b.minedAt - a.minedAt; // If same height, sort by mining time
+		});
+		
+		// Group blocks by height
+		const blocksByHeight = {};
+		flatTree.forEach(block => {
+			if (!blocksByHeight[block.height]) {
+				blocksByHeight[block.height] = [];
+			}
+			blocksByHeight[block.height].push(block);
+		});
+		
+		// Create the final tree structure
+		const tree = [];
+		const heights = Object.keys(blocksByHeight).sort((a, b) => parseInt(b) - parseInt(a)); // Sort heights in descending order (newest first)
+		
+		heights.forEach(height => {
+			tree.push({
+				height: parseInt(height),
+				blocks: blocksByHeight[height]
+			});
+		});
+		
+		blockTree = tree;
+	}
+	
 	// Create update store
 	const updateStore = createUpdateStore(blockchainId, { blocks: [], mempool: [] });
 	
 	// Subscribe to updates
 	const unsubscribe = updateStore.subscribe(data => {
-		if (data.blocks) blocks = data.blocks;
+		if (data.blocks) {
+			// Preserve user information when updating blocks
+			if (blocks.length > 0 && data.blocks.length > 0) {
+				// Create a map of existing blocks with their miner usernames
+				const existingBlockInfo = {};
+				blocks.forEach(block => {
+					if (block.minerUsername) {
+						existingBlockInfo[block.id] = {
+							minerUsername: block.minerUsername
+						};
+					}
+				});
+				
+				// Apply existing miner usernames to new blocks if missing
+				blocks = data.blocks.map(block => {
+					if (!block.minerUsername && existingBlockInfo[block.id]?.minerUsername) {
+						return {
+							...block,
+							minerUsername: existingBlockInfo[block.id].minerUsername
+						};
+					}
+					return block;
+				});
+			} else {
+				blocks = data.blocks;
+			}
+		}
 		if (data.mempool) mempool = data.mempool;
 	});
 	
@@ -390,7 +511,7 @@
 				</div>
 			</div>
 			
-			<!-- Blockchain Visualization -->
+					<!-- Blockchain Visualization -->
 			<div class="mb-8">
 				<h2 class="text-2xl font-bold mb-4">Blockchain</h2>
 				
@@ -401,64 +522,169 @@
 				{:else}
 					<div class="overflow-x-auto pb-4">
 						<div class="flex space-x-4" style="min-width: max-content;">
-							{#each blocks as block (block.id)}
-								<div 
-									class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
-									class:border-purple-500={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
-								>
-									<div class="mb-2 flex justify-between items-center">
-										<span class="font-bold text-cyan-400">Block</span>
-										<span class="text-xs text-cyan-600">{timeAgo(block.minedAt)}</span>
-									</div>
-									
-									<div class="mb-2">
-										<span class="text-cyan-500">Hash:</span>
-										<span class="text-xs text-cyan-300 break-all">{block.hash.substring(0, 16)}...</span>
-									</div>
-									
-									<div class="mb-2">
-										<span class="text-cyan-500">Previous:</span>
-										<span class="text-xs text-cyan-300 break-all">{block.previousHash.substring(0, 16)}...</span>
-									</div>
-									
-									<div class="mb-2">
-										<span class="text-cyan-500">Miner:</span>
-										<span class="text-cyan-300">{block.minerUsername || 'Unknown'}</span>
-									</div>
-									
-									<div class="mb-2">
-										<span class="text-cyan-500">Nonce:</span>
-										<span class="text-cyan-300">{block.nonce}</span>
-									</div>
-									
-									<div class="flex justify-between items-center">
-										<div>
-											<span class="text-cyan-500">Transactions:</span>
-											<span class="text-cyan-300">{block.transactions ? block.transactions.length : 0}</span>
-										</div>
-										<div class="flex space-x-2">
-											<button 
-												on:click={() => toggleBlock(block.id)} 
-												class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
-												title="View Transactions"
+							{#each blockTree as heightGroup}
+								<div class="flex flex-col space-y-2">
+									{#if !showAllForks && heightGroup.blocks.length > 3}
+										<!-- Show limited forks with option to expand -->
+										{#each heightGroup.blocks.slice(0, 2) as block}
+											<div 
+												class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
+												class:border-purple-500={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
 											>
-												<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-													<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-													<path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
-												</svg>
-											</button>
+												<div class="mb-2 flex justify-between items-center">
+													<span class="font-bold text-cyan-400">Block {block.height}</span>
+													<span class="text-xs text-cyan-600">{timeAgo(block.minedAt)}</span>
+												</div>
+												
+												<div class="mb-2">
+													<span class="text-cyan-500">Hash:</span>
+													<span class="text-xs text-cyan-300 break-all">{block.hash.substring(0, 16)}...</span>
+												</div>
+												
+												<div class="mb-2">
+													<span class="text-cyan-500">Previous:</span>
+													<span 
+														class="text-xs text-cyan-300 break-all"
+														class:border-purple-500={selectedPreviousBlock && block.previousHash === selectedPreviousBlock.hash}
+														class:border-b={selectedPreviousBlock && block.previousHash === selectedPreviousBlock.hash}
+														class:pb-1={selectedPreviousBlock && block.previousHash === selectedPreviousBlock.hash}
+													>
+														{block.previousHash.substring(0, 16)}...
+													</span>
+												</div>
+												
+												<div class="mb-2">
+													<span class="text-cyan-500">Miner:</span>
+													<span class="text-cyan-300">{block.minerUsername || 'Unknown'}</span>
+												</div>
+												
+												<div class="mb-2">
+													<span class="text-cyan-500">Nonce:</span>
+													<span class="text-cyan-300">{block.nonce}</span>
+												</div>
+												
+												<div class="flex justify-between items-center">
+													<div>
+														<span class="text-cyan-500">Transactions:</span>
+														<span class="text-cyan-300">{block.transactions ? block.transactions.length : 0}</span>
+													</div>
+													<div class="flex space-x-2">
+														<button 
+															on:click={() => toggleBlock(block.id)} 
+															class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
+															title="View Transactions"
+														>
+															<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+																<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+																<path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+															</svg>
+														</button>
+														<button 
+															on:click={() => selectedPreviousBlock = block} 
+															class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
+															title="Select as Previous Block"
+															disabled={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
+														>
+															<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+																<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+															</svg>
+														</button>
+													</div>
+												</div>
+											</div>
+										{/each}
+										
+										<!-- Partial block to indicate more -->
+										<div class="cyberpunk-box rounded-lg p-4 min-w-[250px] opacity-80">
+											<div class="mb-2 flex justify-between items-center">
+												<span class="font-bold text-cyan-400">+{heightGroup.blocks.length - 2} more forks</span>
+											</div>
 											<button 
-												on:click={() => selectedPreviousBlock = block} 
-												class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
-												title="Select as Previous Block"
-												disabled={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
+												on:click={() => showAllForks = true}
+												class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
 											>
-												<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-													<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-												</svg>
+												Show All Forks
 											</button>
 										</div>
-									</div>
+									{:else}
+										<!-- Show all forks -->
+										{#each heightGroup.blocks as block}
+											<div 
+												class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
+												class:border-purple-500={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
+											>
+												<div class="mb-2 flex justify-between items-center">
+													<span class="font-bold text-cyan-400">Block {block.height}</span>
+													<span class="text-xs text-cyan-600">{timeAgo(block.minedAt)}</span>
+												</div>
+												
+												<div class="mb-2">
+													<span class="text-cyan-500">Hash:</span>
+													<span class="text-xs text-cyan-300 break-all">{block.hash.substring(0, 16)}...</span>
+												</div>
+												
+												<div class="mb-2">
+													<span class="text-cyan-500">Previous:</span>
+													<span 
+														class="text-xs text-cyan-300 break-all"
+														class:border-purple-500={selectedPreviousBlock && block.previousHash === selectedPreviousBlock.hash}
+														class:border-b={selectedPreviousBlock && block.previousHash === selectedPreviousBlock.hash}
+														class:pb-1={selectedPreviousBlock && block.previousHash === selectedPreviousBlock.hash}
+													>
+														{block.previousHash.substring(0, 16)}...
+													</span>
+												</div>
+											
+												<div class="mb-2">
+													<span class="text-cyan-500">Miner:</span>
+													<span class="text-cyan-300">{block.minerUsername || 'Unknown'}</span>
+												</div>
+												
+												<div class="mb-2">
+													<span class="text-cyan-500">Nonce:</span>
+													<span class="text-cyan-300">{block.nonce}</span>
+												</div>
+												
+												<div class="flex justify-between items-center">
+													<div>
+														<span class="text-cyan-500">Transactions:</span>
+														<span class="text-cyan-300">{block.transactions ? block.transactions.length : 0}</span>
+													</div>
+													<div class="flex space-x-2">
+														<button 
+															on:click={() => toggleBlock(block.id)} 
+															class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
+															title="View Transactions"
+														>
+															<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+																<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+																<path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+															</svg>
+														</button>
+														<button 
+															on:click={() => selectedPreviousBlock = block} 
+															class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
+															title="Select as Previous Block"
+															disabled={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
+														>
+															<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+																<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+															</svg>
+														</button>
+													</div>
+												</div>
+											</div>
+										{/each}
+										
+										{#if heightGroup.blocks.length > 3 && showAllForks}
+											<button 
+												on:click={() => showAllForks = false}
+												class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+											>
+												Hide Extra Forks
+											</button>
+										{/if}
+									{/if}
 								</div>
 							{/each}
 						</div>

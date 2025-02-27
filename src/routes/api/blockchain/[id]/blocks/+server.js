@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { blockchain, block, transaction } from '$lib/server/db/schema';
+import { blockchain, block, transaction, user } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { calculateBlockHash, isValidHash } from '$lib/utils/crypto.js';
 
@@ -23,6 +23,15 @@ export async function GET({ params }) {
     // Get all transactions for the blocks
     const transactions = await db.select().from(transaction).where(eq(transaction.blockchainId, id));
 
+    // Get all users for the blockchain to map miner IDs to usernames
+    const users = await db.select().from(user).where(eq(user.blockchainId, id));
+
+    // Create a map of user IDs to usernames
+    const userMap = {};
+    for (const u of users) {
+      userMap[u.id] = u.username;
+    }
+
     // Group transactions by block
     const blockTransactions = {};
     for (const tx of transactions) {
@@ -34,9 +43,10 @@ export async function GET({ params }) {
       }
     }
 
-    // Add transactions to blocks
+    // Add transactions and miner usernames to blocks
     const blocksWithTransactions = blocks.map(b => ({
       ...b,
+      minerUsername: b.minerId ? userMap[b.minerId] : null,
       transactions: blockTransactions[b.id] || []
     }));
 
@@ -149,9 +159,14 @@ export async function POST({ params, request }) {
         .where(eq(transaction.id, tx.id));
     }
 
-    // Return the new block with transactions
+    // Get the miner's username
+    const miners = await db.select().from(user).where(eq(user.id, data.minerId));
+    const minerUsername = miners.length > 0 ? miners[0].username : null;
+
+    // Return the new block with transactions and miner username
     return json({
       ...newBlock,
+      minerUsername,
       transactions: includedTransactions
     }, { status: 201 });
   } catch (error) {
