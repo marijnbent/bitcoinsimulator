@@ -491,10 +491,10 @@
 	}
 
 	$effect(() => {
-        if (error) {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    });
+		if (error) {
+			window.scrollTo({ top: 0, behavior: "smooth" });
+		}
+	});
 </script>
 
 <div class="py-6">
@@ -508,8 +508,17 @@
 				class="text-red-300 hover:text-red-200"
 				title="Dismiss"
 			>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-5 w-5"
+					viewBox="0 0 20 20"
+					fill="currentColor"
+				>
+					<path
+						fill-rule="evenodd"
+						d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+						clip-rule="evenodd"
+					/>
 				</svg>
 			</button>
 		</div>
@@ -618,9 +627,9 @@
 										{#each heightGroup.blocks.slice(0, 2) as block}
 											<div
 												class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
-												class:border-purple-500={selectedPreviousBlock &&
-													selectedPreviousBlock.id ===
-														block.id}
+												class:bg-cyan-900={selectedPreviousBlock &&
+													selectedPreviousBlock.hash ===
+														block.hash}
 											>
 												<div
 													class="mb-2 flex justify-between items-center"
@@ -656,15 +665,6 @@
 													>
 													<span
 														class="text-xs text-cyan-300 break-all"
-														class:border-purple-500={selectedPreviousBlock &&
-															block.previousHash ===
-																selectedPreviousBlock.hash}
-														class:border-b={selectedPreviousBlock &&
-															block.previousHash ===
-																selectedPreviousBlock.hash}
-														class:pb-1={selectedPreviousBlock &&
-															block.previousHash ===
-																selectedPreviousBlock.hash}
 													>
 														{block.previousHash.substring(
 															0,
@@ -788,7 +788,7 @@
 										{#each heightGroup.blocks as block}
 											<div
 												class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
-												class:border-purple-500={selectedPreviousBlock &&
+												class:border-purple-700={selectedPreviousBlock &&
 													selectedPreviousBlock.id ===
 														block.id}
 											>
@@ -826,15 +826,6 @@
 													>
 													<span
 														class="text-xs text-cyan-300 break-all"
-														class:border-purple-500={selectedPreviousBlock &&
-															block.previousHash ===
-																selectedPreviousBlock.hash}
-														class:border-b={selectedPreviousBlock &&
-															block.previousHash ===
-																selectedPreviousBlock.hash}
-														class:pb-1={selectedPreviousBlock &&
-															block.previousHash ===
-																selectedPreviousBlock.hash}
 													>
 														{block.previousHash.substring(
 															0,
