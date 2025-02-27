@@ -303,6 +303,24 @@
 			<!-- Send Transaction -->
 			<div class="mb-8 p-6 cyberpunk-box rounded-lg">
 				<h2 class="text-xl font-bold mb-4">Send Transaction</h2>
+
+				<div class="flex flex-wrap gap-2 mb-6">
+					{#each users.filter(u => u.id !== user.id) as otherUser}
+						<button 
+							class="px-3 py-1 text-sm rounded-full transition-colors"
+							class:bg-cyan-700={recipient === otherUser.username}
+							class:text-white={recipient === otherUser.username}
+							class:bg-gray-800={recipient !== otherUser.username}
+							class:text-cyan-400={recipient !== otherUser.username}
+							class:border-cyan-600={recipient !== otherUser.username}
+							class:border={recipient !== otherUser.username}
+							class:hover:bg-cyan-800={recipient !== otherUser.username}
+							on:click={() => recipient = otherUser.username}
+						>
+							{otherUser.username}
+						</button>
+					{/each}
+				</div>
 				
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
