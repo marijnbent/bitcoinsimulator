@@ -90,13 +90,6 @@ export async function POST({ params, request }) {
       return json({ error: 'Invalid hash' }, { status: 400 });
     }
 
-    // Get the latest block
-    const blocks = await db.select()
-      .from(block)
-      .where(eq(block.blockchainId, id))
-      .orderBy(block.minedAt, 'desc')
-      .limit(1);
-
     // Find the block with matching hash to data.previousHash
     const previousBlock = await db.select()
       .from(block)
@@ -108,16 +101,32 @@ export async function POST({ params, request }) {
       )
       .limit(1);
 
+    console.log(previousBlock);
+
     if (previousBlock.length === 0) {
       return json({ error: 'Previous block not found' }, { status: 400 });
     }
 
     const previousHash = previousBlock[0].hash;
-    
+
     // Calculate the height of the new block
     const previousHeight = previousBlock[0].height !== null ? previousBlock[0].height : -1;
     const newHeight = previousHeight + 1;
-    
+
+    // Check for existing block with same hash or height
+    const existingBlock = await db.select()
+      .from(block)
+      .where(
+        and(
+          eq(block.blockchainId, id),
+          eq(block.hash, data.hash)
+        )
+      );
+
+    if (existingBlock.length > 0) {
+      return json({ error: 'Block with this hash already exists' }, { status: 400 });
+    }
+
     // Get transactions from mempool
     const mempoolTransactions = await db.select()
       .from(transaction)
