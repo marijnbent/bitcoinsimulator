@@ -83,4 +83,9 @@
 		background-color: rgba(17, 24, 39, 0.8); /* bg-gray-900 with opacity */
 		box-shadow: 0 0 10px #0e7490, inset 0 0 5px #0e7490;
 	}
+	
+	:global(.cyberpunk-box-selected) {
+		border: 1px solid #7e22ce !important; /* border-purple-700 */
+		box-shadow: 0 0 10px #7e22ce, inset 0 0 5px #7e22ce !important;
+	}
 </style>

@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { blockchain, block, transaction, user } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { calculateBlockHash, isValidHash } from '$lib/utils/crypto.js';
 
 // GET /api/blockchain/[id]/blocks - Get all blocks for a blockchain
@@ -47,7 +47,11 @@ export async function GET({ params }) {
     const blocksWithTransactions = blocks.map(b => ({
       ...b,
       minerUsername: b.minerId ? userMap[b.minerId] : null,
-      transactions: blockTransactions[b.id] || []
+      transactions: (blockTransactions[b.id] || []).map(tx => ({
+        ...tx,
+        senderUsername: tx.senderId ? userMap[tx.senderId] : null,
+        recipientUsername: tx.recipientId ? userMap[tx.recipientId] : null
+      }))
     }));
 
     return json(blocksWithTransactions);
@@ -177,11 +181,37 @@ export async function POST({ params, request }) {
     const miners = await db.select().from(user).where(eq(user.id, data.minerId));
     const minerUsername = miners.length > 0 ? miners[0].username : null;
 
+    // Get all users for the transactions
+    const userIds = new Set();
+    for (const tx of includedTransactions) {
+      if (tx.senderId) userIds.add(tx.senderId);
+      if (tx.recipientId) userIds.add(tx.recipientId);
+    }
+    
+    const users = await db.select().from(user).where(
+      userIds.size > 0
+        ? inArray(user.id, [...userIds])
+        : undefined
+    );
+    
+    // Create a map of user IDs to usernames
+    const userMap = {};
+    for (const u of users) {
+      userMap[u.id] = u.username;
+    }
+    
+    // Add usernames to transactions
+    const transactionsWithUsernames = includedTransactions.map(tx => ({
+      ...tx,
+      senderUsername: tx.senderId ? userMap[tx.senderId] : null,
+      recipientUsername: tx.recipientId ? userMap[tx.recipientId] : null
+    }));
+
     // Return the new block with transactions and miner username
     return json({
       ...newBlock,
       minerUsername,
-      transactions: includedTransactions
+      transactions: transactionsWithUsernames
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating block:', error);

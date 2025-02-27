@@ -482,11 +482,28 @@
 	}
 
 	// Toggle block expansion
-	function toggleBlock(blockId) {
+	async function toggleBlock(blockId) {
 		if (expandedBlockId === blockId) {
 			expandedBlockId = null;
 		} else {
 			expandedBlockId = blockId;
+			
+			// Fetch the latest block data to ensure we have up-to-date transaction information
+			try {
+				const response = await fetch(`/api/blockchain/${blockchainId}/blocks`);
+				if (response.ok) {
+					const updatedBlocks = await response.json();
+					
+					// Update only the expanded block to ensure it has the latest transaction data
+					const updatedBlock = updatedBlocks.find(b => b.id === blockId);
+					if (updatedBlock) {
+						// Find the block in the current blocks array and update it
+						blocks = blocks.map(b => b.id === blockId ? updatedBlock : b);
+					}
+				}
+			} catch (err) {
+				console.error("Error fetching updated block data:", err);
+			}
 		}
 	}
 
@@ -627,7 +644,7 @@
 										{#each heightGroup.blocks.slice(0, 2) as block}
 											<div
 												class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
-												class:bg-cyan-900={selectedPreviousBlock &&
+												class:cyberpunk-box-selected={selectedPreviousBlock &&
 													selectedPreviousBlock.hash ===
 														block.hash}
 											>
@@ -788,7 +805,7 @@
 										{#each heightGroup.blocks as block}
 											<div
 												class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
-												class:border-purple-700={selectedPreviousBlock &&
+												class:cyberpunk-box-selected={selectedPreviousBlock &&
 													selectedPreviousBlock.id ===
 														block.id}
 											>
