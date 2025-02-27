@@ -19,6 +19,7 @@
 	let blocks = $state([]);
 	let blockTree = $state([]); // Organized blocks with height and fork information
 	let mempool = $state([]);
+	let users = $state([]);
 	let user = $state(null);
 	let isLoading = $state(true);
 	let error = $state(null);
@@ -235,6 +236,15 @@
 				);
 			}
 			mempool = await mempoolResponse.json();
+			
+			// Fetch users
+			const usersResponse = await fetch(`/api/blockchain/${blockchainId}/users`);
+			if (!usersResponse.ok) {
+				throw new Error(
+					`Failed to fetch users: ${usersResponse.statusText}`,
+				);
+			}
+			users = await usersResponse.json();
 
 			isLoading = false;
 
@@ -618,6 +628,20 @@
 						</p>
 					</div>
 				</div>
+				
+				<!-- Active Users -->
+				{#if users.length > 0}
+					<div class="mt-4">
+						<p class="text-cyan-500 mb-2">Active Users:</p>
+						<div class="flex flex-wrap gap-2">
+							{#each users.filter(u => u.id !== user.id) as otherUser}
+								<span class="px-3 py-1 text-sm rounded-full bg-gray-800 text-cyan-400 border border-cyan-600">
+									{otherUser.username}
+								</span>
+							{/each}
+						</div>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Blockchain Visualization -->
