@@ -114,6 +114,10 @@ export async function POST({ params, request }) {
 
     const previousHash = previousBlock[0].hash;
     
+    // Calculate the height of the new block
+    const previousHeight = previousBlock[0].height !== null ? previousBlock[0].height : -1;
+    const newHeight = previousHeight + 1;
+    
     // Get transactions from mempool
     const mempoolTransactions = await db.select()
       .from(transaction)
@@ -143,7 +147,8 @@ export async function POST({ params, request }) {
       minerId: data.minerId,
       nonce: data.nonce,
       minedAt: timestamp,
-      hash: data.hash
+      hash: data.hash,
+      height: newHeight
     };
 
     // Insert the block into the database

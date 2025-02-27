@@ -15,7 +15,8 @@ export const block = sqliteTable('block', {
 	previousHash: text('previous_hash'),
 	minerId: text('miner_id').references(() => user.id),
 	nonce: integer('nonce').notNull(),
-	minedAt: integer('mined_at').notNull()
+	minedAt: integer('mined_at').notNull(),
+	height: integer('height') // Block height (0 for genesis, increments for each block in the chain)
 });
 
 export const transaction = sqliteTable('transaction', {

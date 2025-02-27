@@ -9,7 +9,6 @@
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"db:push": "drizzle-kit push",
-		"db:drop": "drizzle-kit drop",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio"
 	},

@@ -511,7 +511,7 @@
 				</div>
 			</div>
 			
-					<!-- Blockchain Visualization -->
+			<!-- Blockchain Visualization -->
 			<div class="mb-8">
 				<h2 class="text-2xl font-bold mb-4">Blockchain</h2>
 				

@@ -97,6 +97,11 @@ export async function GET({ params, url }) {
       transactions: blockTransactions[b.id] || []
     }));
     
+    // Calculate the highest block height for confirmation counts
+    const maxHeight = blocks.reduce((max, b) => {
+      return (b.height !== undefined && b.height !== null && b.height > max) ? b.height : max;
+    }, 0);
+    
     // Add usernames to mempool transactions
     const mempoolWithUsernames = mempoolTransactions.map(tx => ({
       ...tx,
@@ -112,6 +117,7 @@ export async function GET({ params, url }) {
         recipientUsername: tx.recipientId ? userMap[tx.recipientId] : null
       })),
       mempool: mempoolWithUsernames,
+      maxHeight, // Include the max height for confirmation calculations
       timestamp: Date.now()
     });
   } catch (error) {

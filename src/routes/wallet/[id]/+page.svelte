@@ -27,6 +27,9 @@
 	// Create update store
 	const updateStore = createUpdateStore(blockchainId, { blocks: [], transactions: [] });
 	
+	// State for tracking the maximum block height
+	let maxBlockHeight = 0;
+	
 	// Subscribe to updates
 	const unsubscribe = updateStore.subscribe(data => {
 		if (data.blocks) {
@@ -35,6 +38,9 @@
 		}
 		if (data.transactions) {
 			updateTransactions();
+		}
+		if (data.maxHeight !== undefined) {
+			maxBlockHeight = data.maxHeight;
 		}
 	});
 	
@@ -106,6 +112,7 @@
 		// Get all transactions for this user
 		const userTransactions = [];
 		
+		// Get confirmed transactions from blocks
 		for (const block of blocks) {
 			if (block.transactions) {
 				for (const tx of block.transactions) {
@@ -113,15 +120,55 @@
 						userTransactions.push({
 							...tx,
 							block,
-							confirmed: true
+							confirmed: true,
+							confirmations: getConfirmations(block)
 						});
 					}
 				}
 			}
 		}
 		
-		// Sort by timestamp (newest first)
-		transactions = userTransactions.sort((a, b) => b.createdAt - a.createdAt);
+		// Get mempool transactions
+		fetch(`/api/blockchain/${blockchainId}/transactions?mempool=true`)
+			.then(response => response.json())
+			.then(mempoolTransactions => {
+				// Add mempool transactions for this user
+				for (const tx of mempoolTransactions) {
+					if (tx.senderId === user.id || tx.recipientId === user.id) {
+						// Check if this transaction is already in the list (might have been confirmed)
+						const existingTx = userTransactions.find(t => t.id === tx.id);
+						if (!existingTx) {
+							userTransactions.push({
+								...tx,
+								confirmed: false,
+								confirmations: 0
+							});
+						}
+					}
+				}
+				
+				// Sort by timestamp (newest first)
+				transactions = userTransactions.sort((a, b) => b.createdAt - a.createdAt);
+			})
+			.catch(err => {
+				console.error('Error fetching mempool transactions:', err);
+			});
+	}
+	
+	// Calculate confirmations for a block
+	function getConfirmations(block) {
+		if (!block || block.height === undefined || block.height === null) return 0;
+		
+		// Use the maxBlockHeight from updates or calculate it from blocks
+		let currentMaxHeight = maxBlockHeight;
+		if (currentMaxHeight === 0 && blocks.length > 0) {
+			currentMaxHeight = blocks.reduce((max, b) => {
+				return (b.height !== undefined && b.height !== null && b.height > max) ? b.height : max;
+			}, 0);
+		}
+		
+		// Calculate confirmations (current chain height - block height + 1)
+		return currentMaxHeight - block.height + 1;
 	}
 	
 	// Send a transaction
@@ -342,9 +389,11 @@
 										</td>
 										<td class="p-2">
 											{#if tx.confirmed}
-												<span class="text-green-400">Confirmed</span>
+												<span class="text-green-400">
+													Confirmed ({tx.confirmations} {tx.confirmations === 1 ? 'confirmation' : 'confirmations'})
+												</span>
 											{:else}
-												<span class="text-yellow-400">Pending</span>
+												<span class="text-yellow-400">Pending (in mempool)</span>
 											{/if}
 										</td>
 									</tr>
