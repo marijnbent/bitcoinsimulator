@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { blockchain, transaction, user } from '$lib/server/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 
 // GET /api/blockchain/[id]/transactions - Get all transactions for a blockchain
 export async function GET({ params, url }) {
@@ -26,6 +26,7 @@ export async function GET({ params, url }) {
     }
     
     const transactions = await query;
+    console.log('Transactions in mempool:', transactions);
     
     // Get all users for the transactions
     const userIds = new Set();
@@ -35,8 +36,8 @@ export async function GET({ params, url }) {
     }
     
     const users = await db.select().from(user).where(
-      userIds.size > 0 
-        ? user.id.in([...userIds]) 
+      userIds.size > 0
+        ? inArray(user.id, [...userIds])
         : undefined
     );
     
