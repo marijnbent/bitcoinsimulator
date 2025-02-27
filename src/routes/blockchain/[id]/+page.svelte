@@ -10,26 +10,26 @@
 	const blockchainId = $page.params.id;
 	
 	// State
-	let blockchain = null;
-	let blocks = [];
-	let mempool = [];
-	let user = null;
-	let isLoading = true;
-	let error = null;
-	let expandedBlockId = null;
+	let blockchain = $state(null);
+	let blocks = $state([]);
+	let mempool = $state([]);
+	let user = $state(null);
+	let isLoading = $state(true);
+	let error = $state(null);
+	let expandedBlockId = $state(null);
 	
 	// User registration
-	let userName = '';
-	let isRegistering = false;
+	let userName = $state('');
+	let isRegistering = $state(false);
 	
 	// Mining interface
-	let selectedTransactions = [];
-	let nonce = 0;
-	let currentHash = '';
-	let isMining = false;
-	let autoMining = false;
-	let selectedPreviousBlock = null;
-	let generatedHashes = [];
+	let selectedTransactions = $state([]);
+	let nonce = $state(0);
+	let currentHash = $state('');
+	let isMining = $state(false);
+	let autoMining = $state(false);
+	let selectedPreviousBlock = $state(null);
+	let generatedHashes = $state([]);
 	const maxHashesToShow = 5;
 	
 	// Set the latest block as the default previous block when blocks are loaded
@@ -438,7 +438,7 @@
 										<div class="flex space-x-2">
 											<button 
 												on:click={() => toggleBlock(block.id)} 
-												class="text-cyan-400 hover:text-cyan-300 focus:outline-none"
+												class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
 												title="View Transactions"
 											>
 												<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -448,7 +448,7 @@
 											</button>
 											<button 
 												on:click={() => selectedPreviousBlock = block} 
-												class="text-purple-400 hover:text-purple-300 focus:outline-none"
+												class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
 												title="Select as Previous Block"
 												disabled={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
 											>
@@ -587,16 +587,7 @@
 						>
 							{currentHash || 'Click "Calculate Hash" to generate'}
 						</div>
-					</div>
-					
-					<!-- Target -->
-					<div class="mb-4">
-						<label class="block text-sm text-cyan-500 mb-1">
-							Target: {blockchain.leadingZeros} leading zeros
-						</label>
-						<div class="p-2 bg-gray-800 border border-cyan-800 rounded font-mono text-xs">
-							{'0'.repeat(blockchain.leadingZeros)}...
-						</div>
+						<span class="text-xs">Target: {blockchain.leadingZeros} leading zeros</span>
 					</div>
 					
 					<!-- Generated Hashes -->

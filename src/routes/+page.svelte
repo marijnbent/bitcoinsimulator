@@ -11,7 +11,7 @@
 	
 	// State for new blockchain creation
 	let newBlockchainName = '';
-	let leadingZeros = 3;
+	let leadingZeros = 4;
 	let blockReward = 3.125;
 	let isCreating = false;
 	let isConnecting = false;
