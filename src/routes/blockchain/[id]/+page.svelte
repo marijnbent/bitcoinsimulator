@@ -55,18 +55,26 @@
 			// Find the latest block
 			selectedPreviousBlock = blocks.reduce(
 				(latest, block) =>
-					block.minedAt > latest.minedAt ? block : latest,
+					block.height > latest.height ? block : latest,
 				blocks[0],
 			);
 		}
 	});
 
-	// Function to build the block tree structure with heights and forks
+	// Function to build the block tree structure with chains and forks
 	function buildBlockTree() {
 		// Create a map of blocks by hash for quick lookup
 		const blocksByHash = {};
 		blocks.forEach((block) => {
-			blocksByHash[block.hash] = { ...block, children: [], height: -1 };
+			blocksByHash[block.hash] = { 
+				...block, 
+				children: [], 
+				height: -1,
+				isInLongestChain: false, // Flag for blocks in the longest chain
+				forkParent: null, // Hash of the block this fork branches from
+				column: -1, // Column position in the grid (based on height)
+				row: -1 // Row position in the grid (0 for main chain, 1+ for forks)
+			};
 		});
 
 		// Find the genesis block (the one with no previous hash or self-referential)
@@ -116,6 +124,7 @@
 
 			// Assign height and mark as processed
 			block.height = height;
+			block.column = height; // Column position is based on height
 			processed.add(block.hash);
 
 			// Add children to queue
@@ -124,36 +133,188 @@
 			});
 		}
 
-		// Convert to array and sort by height (descending) and then by minedAt (descending)
-		const flatTree = Object.values(blocksByHash);
-		flatTree.sort((a, b) => {
-			if (b.height !== a.height) return b.height - a.height; // Newest blocks first
-			return b.minedAt - a.minedAt; // If same height, sort by mining time
-		});
+		// Find the longest chain and mark blocks in it
+		let longestChainTip = null;
+		let maxHeight = -1;
 
-		// Group blocks by height
-		const blocksByHeight = {};
-		flatTree.forEach((block) => {
-			if (!blocksByHeight[block.height]) {
-				blocksByHeight[block.height] = [];
+		// Find the tip of the longest chain
+		Object.values(blocksByHash).forEach(block => {
+			if (block.height > maxHeight) {
+				maxHeight = block.height;
+				longestChainTip = block;
 			}
-			blocksByHeight[block.height].push(block);
 		});
 
-		// Create the final tree structure
-		const tree = [];
-		const heights = Object.keys(blocksByHeight).sort(
-			(a, b) => parseInt(b) - parseInt(a),
-		); // Sort heights in descending order (newest first)
+		// Mark all blocks in the longest chain
+		if (longestChainTip) {
+			let current = longestChainTip;
+			while (current) {
+				current.isInLongestChain = true;
+				current.row = 0; // Main chain is always in row 0
+				// Move to parent block
+				current = current.previousHash && blocksByHash[current.previousHash];
+			}
+		}
 
-		heights.forEach((height) => {
-			tree.push({
-				height: parseInt(height),
-				blocks: blocksByHeight[height],
+		// Find fork points and assign rows to fork chains
+		let nextForkRow = 1;
+		const forkPoints = [];
+		
+		// Identify all fork points (blocks with multiple children)
+		Object.values(blocksByHash).forEach(block => {
+			if (block.children.length > 1) {
+				// Sort children: longest chain first, then by height
+				block.children.sort((a, b) => {
+					if (a.isInLongestChain && !b.isInLongestChain) return -1;
+					if (!a.isInLongestChain && b.isInLongestChain) return 1;
+					return b.height - a.height;
+				});
+				
+				// The first child is part of the main chain, the rest are forks
+				const forkChildren = block.children.filter(child => !child.isInLongestChain);
+				
+				if (forkChildren.length > 0) {
+					forkPoints.push({
+						parent: block,
+						forkChildren
+					});
+				}
+			}
+		});
+		
+		// Create a map to track which columns are occupied in each row
+		// This helps us reuse rows when possible
+		const occupiedPositions = new Map();
+		
+		// Helper function to check if a position is available
+		const isPositionAvailable = (row, column) => {
+			const key = `${row},${column}`;
+			return !occupiedPositions.has(key);
+		};
+		
+		// Helper function to mark a position as occupied
+		const markPositionOccupied = (row, column) => {
+			const key = `${row},${column}`;
+			occupiedPositions.set(key, true);
+		};
+		
+		// Helper function to find the first available row for a fork chain
+		const findAvailableRow = (startColumn, endColumn) => {
+			let row = 1;
+			while (true) {
+				let rowAvailable = true;
+				
+				// Check if all positions in this row from startColumn to endColumn are available
+				for (let col = startColumn; col <= endColumn; col++) {
+					if (!isPositionAvailable(row, col)) {
+						rowAvailable = false;
+						break;
+					}
+				}
+				
+				if (rowAvailable) {
+					return row;
+				}
+				
+				row++;
+			}
+		};
+		
+		// Process each fork point
+		forkPoints.forEach(({ parent, forkChildren }) => {
+			// Group forks by their end column (height)
+			const forksByEndColumn = new Map();
+			
+			// First, determine the end column for each fork chain
+			forkChildren.forEach(forkChild => {
+				// Mark this fork child as a fork
+				forkChild.forkParent = parent.hash;
+				
+				// Find the end of this fork chain
+				let endColumn = forkChild.column;
+				let current = forkChild;
+				const processed = new Set([current.hash]);
+				
+				// Process all descendants of this fork to find the furthest one
+				const queue = [current];
+				while (queue.length > 0) {
+					const block = queue.shift();
+					
+					if (block.column > endColumn) {
+						endColumn = block.column;
+					}
+					
+					// Process all children
+					block.children.forEach(child => {
+						if (!processed.has(child.hash)) {
+							processed.add(child.hash);
+							queue.push(child);
+						}
+					});
+				}
+				
+				// Group by end column
+				if (!forksByEndColumn.has(endColumn)) {
+					forksByEndColumn.set(endColumn, []);
+				}
+				forksByEndColumn.get(endColumn).push({
+					startBlock: forkChild,
+					endColumn,
+					blocks: Array.from(processed).map(hash => blocksByHash[hash])
+				});
 			});
+			
+			// Now assign rows to forks, trying to reuse rows when possible
+			Array.from(forksByEndColumn.entries())
+				.sort((a, b) => b[0] - a[0]) // Sort by end column descending (longest forks first)
+				.forEach(([endColumn, forks]) => {
+					forks.forEach(fork => {
+						const startColumn = fork.startBlock.column;
+						
+						// Find an available row for this fork
+						const rowForThisFork = findAvailableRow(startColumn, endColumn);
+						
+						// Mark all positions in this fork chain as occupied
+						for (let col = startColumn; col <= endColumn; col++) {
+							markPositionOccupied(rowForThisFork, col);
+						}
+						
+						// Assign the row to all blocks in this fork chain
+						fork.blocks.forEach(block => {
+							block.row = rowForThisFork;
+						});
+					});
+				});
 		});
-
-		blockTree = tree;
+		
+		// Create a grid structure for the blocks
+		// First, determine the maximum height and row
+		const maxColumn = maxHeight;
+		
+		// Find the maximum row used by any block
+		let maxRow = 0;
+		Object.values(blocksByHash).forEach(block => {
+			if (block.row > maxRow) {
+				maxRow = block.row;
+			}
+		});
+		
+		// Create a 2D grid with empty cells (ensure at least one row)
+		const grid = Array(Math.max(maxRow + 1, 1)).fill().map(() => Array(maxColumn + 1).fill(null));
+		
+		// Place blocks in the grid
+		Object.values(blocksByHash).forEach(block => {
+			if (block.row >= 0 && block.column >= 0) {
+				grid[block.row][block.column] = block;
+			}
+		});
+		
+		blockTree = {
+			grid,
+			maxRow,
+			maxColumn,
+			blocksByHash
+		};
 	}
 
 	// Create update store
@@ -236,7 +397,7 @@
 				);
 			}
 			mempool = await mempoolResponse.json();
-			
+
 			// Fetch users
 			const usersResponse = await fetch(`/api/blockchain/${blockchainId}/users`);
 			if (!usersResponse.ok) {
@@ -274,7 +435,7 @@
 
 		try {
 			console.log("Registering user with name:", userName);
-			
+
 			const response = await fetch(
 				`/api/blockchain/${blockchainId}/users`,
 				{
@@ -298,7 +459,7 @@
 
 			// Save user to localStorage
 			saveUser(user);
-			
+
 			// Clear form
 			userName = "";
 			error = null;
@@ -501,13 +662,13 @@
 			expandedBlockId = null;
 		} else {
 			expandedBlockId = blockId;
-			
+
 			// Fetch the latest block data to ensure we have up-to-date transaction information
 			try {
 				const response = await fetch(`/api/blockchain/${blockchainId}/blocks`);
 				if (response.ok) {
 					const updatedBlocks = await response.json();
-					
+
 					// Update only the expanded block to ensure it has the latest transaction data
 					const updatedBlock = updatedBlocks.find(b => b.id === blockId);
 					if (updatedBlock) {
@@ -632,7 +793,7 @@
 						</p>
 					</div>
 				</div>
-				
+
 				<!-- Active Users -->
 				{#if users.length > 0}
 					<div class="mt-4">
@@ -661,325 +822,231 @@
 					</div>
 				{:else}
 					<div class="overflow-x-auto pb-4">
-						<div
-							class="flex space-x-4"
-							style="min-width: max-content;"
-						>
-							{#each blockTree as heightGroup}
-								<div class="flex flex-col space-y-2">
-									{#if !showAllForks && heightGroup.blocks.length > 3}
-										<!-- Show limited forks with option to expand -->
-										{#each heightGroup.blocks.slice(0, 2) as block}
-											<div
-												class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
-												class:cyberpunk-box-selected={selectedPreviousBlock &&
-													selectedPreviousBlock.hash ===
-														block.hash}
-											>
-												<div
-													class="mb-2 flex justify-between items-center"
-												>
-													<span
-														class="font-bold text-cyan-400"
-														>Block {block.height}</span
-													>
-													<span
-														class="text-xs text-cyan-600"
-														>{timeAgo(
-															block.minedAt,
-														)}</span
-													>
-												</div>
-
-												<div class="mb-2">
-													<span class="text-cyan-500"
-														>Hash:</span
-													>
-													<span
-														class="text-xs text-cyan-300 break-all"
-														>{block.hash.substring(
-															0,
-															16,
-														)}...</span
-													>
-												</div>
-
-												<div class="mb-2">
-													<span class="text-cyan-500"
-														>Previous:</span
-													>
-													<span
-														class="text-xs text-cyan-300 break-all"
-													>
-														{block.previousHash.substring(
-															0,
-															16,
-														)}...
-													</span>
-												</div>
-
-												<div class="mb-2">
-													<span class="text-cyan-500"
-														>Miner:</span
-													>
-													<span class="text-cyan-300"
-														>{block.minerUsername ||
-															"Unknown"}</span
-													>
-												</div>
-
-												<div class="mb-2">
-													<span class="text-cyan-500"
-														>Nonce:</span
-													>
-													<span class="text-cyan-300"
-														>{block.nonce}</span
-													>
-												</div>
-
-												<div
-													class="flex justify-between items-center"
-												>
-													<div>
-														<span
-															class="text-cyan-500"
-															>Transactions:</span
-														>
-														<span
-															class="text-cyan-300"
-															>{block.transactions
-																? block
-																		.transactions
-																		.length
-																: 0}</span
-														>
-													</div>
-													<div class="flex space-x-2">
-														<button
-															on:click={() =>
-																toggleBlock(
-																	block.id,
-																)}
-															class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
-															title="View Transactions"
-														>
-															<svg
-																xmlns="http://www.w3.org/2000/svg"
-																class="h-5 w-5"
-																viewBox="0 0 20 20"
-																fill="currentColor"
-															>
-																<path
-																	d="M10 12a2 2 0 100-4 2 2 0 000 4z"
-																/>
-																<path
-																	fill-rule="evenodd"
-																	d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-																	clip-rule="evenodd"
-																/>
-															</svg>
-														</button>
-														<button
-															on:click={() =>
-																(selectedPreviousBlock =
-																	block)}
-															class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
-															title="Select as Previous Block"
-															disabled={selectedPreviousBlock &&
-																selectedPreviousBlock.id ===
-																	block.id}
-														>
-															<svg
-																xmlns="http://www.w3.org/2000/svg"
-																class="h-5 w-5"
-																viewBox="0 0 20 20"
-																fill="currentColor"
-															>
-																<path
-																	fill-rule="evenodd"
-																	d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-																	clip-rule="evenodd"
-																/>
-															</svg>
-														</button>
-													</div>
-												</div>
+						<div class="grid-container" style="min-width: max-content;">
+							<!-- Check if blockTree is an array (old format) or object (new format) -->
+							{#if Array.isArray(blockTree)}
+								<!-- Old format - display chains as before -->
+								<div class="flex flex-col space-y-6">
+									{#each blockTree as chain}
+										<div class="flex flex-col">
+											<!-- Chain label -->
+											<div class="mb-2 ml-2">
+												{#if chain.isLongestChain}
+													<span class="text-green-400 font-bold">Longest Chain</span>
+												{:else}
+													<span class="text-yellow-400">Fork Chain</span>
+												{/if}
 											</div>
-										{/each}
+											
+											<!-- Chain blocks -->
+											<div class="flex items-center">
+												{#each chain.blocks as block, blockIndex}
+													<!-- Connection line to previous block in same chain -->
+													{#if blockIndex > 0}
+														<div class="h-[2px] w-4 bg-cyan-600 self-center"></div>
+													{/if}
+													
+													<!-- Block card -->
+													<div
+														class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors relative"
+														class:cyberpunk-box-selected={selectedPreviousBlock && selectedPreviousBlock.hash === block.hash}
+														class:border-green-500={chain.isLongestChain}
+														class:border-yellow-500={!chain.isLongestChain}
+													>
+														<div class="mb-2 flex justify-between items-center">
+															<span class="font-bold text-cyan-400">Block {block.height}</span>
+															<span class="text-xs text-cyan-600">{timeAgo(block.minedAt)}</span>
+														</div>
 
-										<!-- Partial block to indicate more -->
-										<div
-											class="cyberpunk-box rounded-lg p-4 min-w-[250px] opacity-80"
-										>
-											<div
-												class="mb-2 flex justify-between items-center"
-											>
-												<span
-													class="font-bold text-cyan-400"
-													>+{heightGroup.blocks
-														.length - 2} more forks</span
-												>
+														<div class="mb-2">
+															<span class="text-cyan-500">Hash:</span>
+															<span class="text-xs text-cyan-300 break-all">{block.hash.substring(0, 16)}...</span>
+														</div>
+
+														<div class="mb-2">
+															<span class="text-cyan-500">Previous:</span>
+															<span class="text-xs text-cyan-300 break-all">
+																{block.previousHash.substring(0, 16)}...
+															</span>
+														</div>
+
+														<div class="mb-2">
+															<span class="text-cyan-500">Miner:</span>
+															<span class="text-cyan-300">{block.minerUsername || "Unknown"}</span>
+														</div>
+
+														<div class="mb-2">
+															<span class="text-cyan-500">Nonce:</span>
+															<span class="text-cyan-300">{block.nonce}</span>
+														</div>
+
+														<div class="flex justify-between items-center">
+															<div>
+																<span class="text-cyan-500">Transactions:</span>
+																<span class="text-cyan-300">{block.transactions ? block.transactions.length : 0}</span>
+															</div>
+															<div class="flex space-x-2">
+																<button
+																	on:click={() => toggleBlock(block.id)}
+																	class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
+																	title="View Transactions"
+																>
+																	<svg
+																		xmlns="http://www.w3.org/2000/svg"
+																		class="h-5 w-5"
+																		viewBox="0 0 20 20"
+																		fill="currentColor"
+																	>
+																		<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+																		<path
+																			fill-rule="evenodd"
+																			d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+																			clip-rule="evenodd"
+																		/>
+																	</svg>
+																</button>
+																<button
+																	on:click={() => (selectedPreviousBlock = block)}
+																	class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
+																	title="Select as Previous Block"
+																	disabled={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
+																>
+																	<svg
+																		xmlns="http://www.w3.org/2000/svg"
+																		class="h-5 w-5"
+																		viewBox="0 0 20 20"
+																		fill="currentColor"
+																	>
+																		<path
+																			fill-rule="evenodd"
+																			d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+																			clip-rule="evenodd"
+																		/>
+																	</svg>
+																</button>
+															</div>
+														</div>
+														
+														<!-- Fork connection indicator -->
+														{#if !chain.isLongestChain && blockIndex === 0 && chain.forkParent}
+															<div class="absolute -top-6 left-1/2 transform -translate-x-1/2 h-6 w-[2px] bg-yellow-500"></div>
+														{/if}
+													</div>
+												{/each}
 											</div>
-											<button
-												on:click={() =>
-													(showAllForks = true)}
-												class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
-											>
-												Show All Forks
-											</button>
 										</div>
-									{:else}
-										<!-- Show all forks -->
-										{#each heightGroup.blocks as block}
-											<div
-												class="cyberpunk-box rounded-lg p-4 min-w-[250px] hover:border-cyan-600 transition-colors"
-												class:cyberpunk-box-selected={selectedPreviousBlock &&
-													selectedPreviousBlock.id ===
-														block.id}
-											>
-												<div
-													class="mb-2 flex justify-between items-center"
-												>
-													<span
-														class="font-bold text-cyan-400"
-														>Block {block.height}</span
+									{/each}
+								</div>
+							{:else if blockTree && blockTree.grid}
+								<!-- New format - grid layout -->
+								<div class="grid" style="display: grid; grid-template-columns: repeat({blockTree.maxColumn + 1}, minmax(270px, 1fr)); gap: 1rem;">
+									<!-- For each row in the grid -->
+									{#each Array(blockTree.maxRow + 1) as _, rowIndex}
+										<!-- For each column in the grid -->
+										{#each Array(blockTree.maxColumn + 1) as _, colIndex}
+											<!-- Cell for this position -->
+											<div class="grid-cell" style="grid-row: {rowIndex + 1}; grid-column: {colIndex + 1}; min-height: 200px; position: relative;">
+												<!-- If there's a block at this position -->
+												{#if blockTree.grid[rowIndex] && blockTree.grid[rowIndex][colIndex]}
+													{@const block = blockTree.grid[rowIndex][colIndex]}
+													
+													<!-- Horizontal connection line to previous block -->
+													{#if colIndex > 0 && blockTree.grid[rowIndex] && blockTree.grid[rowIndex][colIndex - 1]}
+														<div class="h-[2px] w-4 bg-cyan-600 absolute left-[-1rem] top-[100px]"></div>
+													{/if}
+													
+													<!-- Vertical connection line to parent block if this is a fork -->
+													{#if block.forkParent && rowIndex > 0}
+														<div class="w-[2px] h-8 bg-yellow-500 absolute left-[50%] top-[-2rem]"></div>
+													{/if}
+													
+													<!-- Block card -->
+													<div
+														class="cyberpunk-box rounded-lg p-4 hover:border-cyan-600 transition-colors"
+														class:cyberpunk-box-selected={selectedPreviousBlock && selectedPreviousBlock.hash === block.hash}
+														class:border-green-500={block.isInLongestChain}
+														class:border-yellow-500={!block.isInLongestChain}
 													>
-													<span
-														class="text-xs text-cyan-600"
-														>{timeAgo(
-															block.minedAt,
-														)}</span
-													>
-												</div>
-
-												<div class="mb-2">
-													<span class="text-cyan-500"
-														>Hash:</span
-													>
-													<span
-														class="text-xs text-cyan-300 break-all"
-														>{block.hash.substring(
-															0,
-															16,
-														)}...</span
-													>
-												</div>
-
-												<div class="mb-2">
-													<span class="text-cyan-500"
-														>Previous:</span
-													>
-													<span
-														class="text-xs text-cyan-300 break-all"
-													>
-														{block.previousHash.substring(
-															0,
-															16,
-														)}...
-													</span>
-												</div>
-
-												<div class="mb-2">
-													<span class="text-cyan-500"
-														>Miner:</span
-													>
-													<span class="text-cyan-300"
-														>{block.minerUsername ||
-															"Unknown"}</span
-													>
-												</div>
-
-												<div class="mb-2">
-													<span class="text-cyan-500"
-														>Nonce:</span
-													>
-													<span class="text-cyan-300"
-														>{block.nonce}</span
-													>
-												</div>
-
-												<div
-													class="flex justify-between items-center"
-												>
-													<div>
-														<span
-															class="text-cyan-500"
-															>Transactions:</span
-														>
-														<span
-															class="text-cyan-300"
-															>{block.transactions
-																? block
-																		.transactions
-																		.length
-																: 0}</span
-														>
+													<div class="mb-2 flex justify-between items-center">
+														<span class="font-bold text-cyan-400">Block {block.height}</span>
+														<span class="text-xs text-cyan-600">{timeAgo(block.minedAt)}</span>
 													</div>
-													<div class="flex space-x-2">
-														<button
-															on:click={() =>
-																toggleBlock(
-																	block.id,
-																)}
-															class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
-															title="View Transactions"
-														>
-															<svg
-																xmlns="http://www.w3.org/2000/svg"
-																class="h-5 w-5"
-																viewBox="0 0 20 20"
-																fill="currentColor"
+
+													<div class="mb-2">
+														<span class="text-cyan-500">Hash:</span>
+														<span class="text-xs text-cyan-300 break-all">{block.hash.substring(0, 16)}...</span>
+													</div>
+
+													<div class="mb-2">
+														<span class="text-cyan-500">Previous:</span>
+														<span class="text-xs text-cyan-300 break-all">
+															{block.previousHash.substring(0, 16)}...
+														</span>
+													</div>
+
+													<div class="mb-2">
+														<span class="text-cyan-500">Miner:</span>
+														<span class="text-cyan-300">{block.minerUsername || "Unknown"}</span>
+													</div>
+
+													<div class="mb-2">
+														<span class="text-cyan-500">Nonce:</span>
+														<span class="text-cyan-300">{block.nonce}</span>
+													</div>
+
+													<div class="flex justify-between items-center">
+														<div>
+															<span class="text-cyan-500">Transactions:</span>
+															<span class="text-cyan-300">{block.transactions ? block.transactions.length : 0}</span>
+														</div>
+														<div class="flex space-x-2">
+															<button
+																on:click={() => toggleBlock(block.id)}
+																class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
+																title="View Transactions"
 															>
-																<path
-																	d="M10 12a2 2 0 100-4 2 2 0 000 4z"
-																/>
-																<path
-																	fill-rule="evenodd"
-																	d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-																	clip-rule="evenodd"
-																/>
-															</svg>
-														</button>
-														<button
-															on:click={() =>
-																(selectedPreviousBlock =
-																	block)}
-															class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
-															title="Select as Previous Block"
-															disabled={selectedPreviousBlock &&
-																selectedPreviousBlock.id ===
-																	block.id}
-														>
-															<svg
-																xmlns="http://www.w3.org/2000/svg"
-																class="h-5 w-5"
-																viewBox="0 0 20 20"
-																fill="currentColor"
+																<svg
+																	xmlns="http://www.w3.org/2000/svg"
+																	class="h-5 w-5"
+																	viewBox="0 0 20 20"
+																	fill="currentColor"
+																>
+																	<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+																	<path
+																		fill-rule="evenodd"
+																		d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+																		clip-rule="evenodd"
+																	/>
+																</svg>
+															</button>
+															<button
+																on:click={() => (selectedPreviousBlock = block)}
+																class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
+																title="Select as Previous Block"
+																disabled={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
 															>
-																<path
-																	fill-rule="evenodd"
-																	d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-																	clip-rule="evenodd"
-																/>
-															</svg>
-														</button>
+																<svg
+																	xmlns="http://www.w3.org/2000/svg"
+																	class="h-5 w-5"
+																	viewBox="0 0 20 20"
+																	fill="currentColor"
+																>
+																	<path
+																		fill-rule="evenodd"
+																		d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+																		clip-rule="evenodd"
+																	/>
+																</svg>
+															</button>
+														</div>
 													</div>
 												</div>
+												{/if}
 											</div>
 										{/each}
-
-										{#if heightGroup.blocks.length > 3 && showAllForks}
-											<button
-												on:click={() =>
-													(showAllForks = false)}
-												class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
-											>
-												Hide Extra Forks
-											</button>
-										{/if}
-									{/if}
+									{/each}
 								</div>
-							{/each}
+							{/if}
 						</div>
 					</div>
 

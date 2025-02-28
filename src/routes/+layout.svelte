@@ -92,7 +92,7 @@
 	}
 	
 	:global(.cyberpunk-glow) {
-		text-shadow: 0 0 5px #22d3ee, 0 0 10px #22d3ee;
+		text-shadow: 0 0 5px #22d3ee, 0 0 6px #22d3ee;
 	}
 	
 	:global(.cyberpunk-box) {

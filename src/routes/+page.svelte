@@ -1,7 +1,6 @@
 <script>
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { saveCurrentBlockchain } from '$lib/utils/storage.js';
 	
 	// State for blockchain selection
 	let publicBlockchain = null;
@@ -40,7 +39,6 @@
 	// Handle public blockchain selection
 	function enterPublicBlockchain() {
 		if (publicBlockchain) {
-			saveCurrentBlockchain(publicBlockchain.id);
 			goto(`/blockchain/${publicBlockchain.id}`);
 		} else {
 			error = 'Public blockchain not available';
@@ -67,9 +65,6 @@
 			}
 			
 			const foundBlockchain = await response.json();
-			
-			// Save the blockchain ID to sessionStorage
-			saveCurrentBlockchain(foundBlockchain.id);
 			
 			// Navigate to the blockchain page
 			goto(`/blockchain/${foundBlockchain.id}`);
@@ -109,9 +104,6 @@
 			
 			const newBlockchain = await response.json();
 			createdBlockchainId = newBlockchain.id;
-			
-			// Save the blockchain ID to sessionStorage
-			saveCurrentBlockchain(newBlockchain.id);
 			
 			// Redirect to the blockchain ID.
 			goto(`/blockchain/${newBlockchain.id}`);
@@ -220,13 +212,13 @@
 						type="range" 
 						bind:value={leadingZeros} 
 						min="1" 
-						max="6" 
+						max="16" 
 						class="w-full"
 					/>
 					<div class="flex justify-between text-xs text-cyan-600">
 						<span>1 (Easy)</span>
 						<span>{leadingZeros}</span>
-						<span>6 (Hard)</span>
+						<span>16 (Hard)</span>
 					</div>
 				</div>
 				
@@ -263,4 +255,22 @@
 			</div>
 		</div>
 	</div>
+
+	<div class="flex flex-col items-center justify-center py-12 max-w-2xl text-center">
+		<h1 class="text-4xl font-bold mb-8 cyberpunk-glow">About this Blockchain Simulator</h1>
+	<p>Dive into cryptocurrency with our Bitcoin Simulator. It's a hands-on way to learn how blockchain works. You can try out Bitcoin without risking real money. See how digital currencies operate and get real experience with decentralized transactions.</p>
+
+    <h2 class="text-2xl font-bold mt-6 mb-4 cyberpunk-glow">Blockchain Viewer: See the Network</h2>
+
+    <p>Watch the blockchain in action. Our viewer shows you how blocks connect and how the network agrees on transactions. You'll see simulated mining and how confirmations verify each transaction. This helps you understand how the blockchain keeps records secure.</p>
+
+    <h2 class="text-2xl font-bold mt-6 mb-4 cyberpunk-glow">Bitcoin Wallet: Practice Transactions</h2>
+
+    <p>Use our simulated Bitcoin wallet to send and receive Bitcoin. You can check transaction statuses and watch confirmations add up. This gives you practical experience with how Bitcoin transactions are processed and verified.</p>
+
+    <h2 class="text-2xl font-bold mt-6 mb-4 cyberpunk-glow">Learn Bitcoin: Hands-on Education</h2>
+
+    <p>Our Bitcoin Simulator is a simple way to learn about cryptocurrency and blockchain. You can experiment and see how everything works. Whether you're a student or just curious, this simulator lets you explore Bitcoin and blockchain easily.</p>
+
+</div>
 </div>
