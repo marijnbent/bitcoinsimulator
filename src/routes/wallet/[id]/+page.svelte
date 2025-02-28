@@ -265,7 +265,7 @@
 		<div class="bg-red-900 border border-red-700 text-red-300 p-4 rounded mb-6">
 			{error}
 			<button 
-				on:click={() => error = null} 
+				onclick={() => error = null} 
 				class="ml-2 text-red-300 hover:text-red-200"
 			>
 				✕
@@ -315,7 +315,7 @@
 							class:border-cyan-600={recipient !== otherUser.username}
 							class:border={recipient !== otherUser.username}
 							class:hover:bg-cyan-800={recipient !== otherUser.username}
-							on:click={() => recipient = otherUser.username}
+							onclick={() => recipient = otherUser.username}
 						>
 							{otherUser.username}
 						</button>
@@ -352,7 +352,7 @@
 				</div>
 				
 				<button 
-					on:click={sendTransaction} 
+					onclick={sendTransaction} 
 					disabled={isSending || !recipient || !amount || amount <= 0 || amount > balance} 
 					class="mt-4 py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
 				>

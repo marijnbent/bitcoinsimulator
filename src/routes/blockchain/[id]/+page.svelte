@@ -696,7 +696,8 @@
 		>
 			<div>{error}</div>
 			<button
-				on:click={() => (error = null)}
+				aria-label="Dismiss"
+				onclick={() => (error = null)}
 				class="text-red-300 hover:text-red-200"
 				title="Dismiss"
 			>
@@ -747,7 +748,8 @@
 			</div>
 
 			<button
-				on:click={registerUser}
+				aria-label="Login"
+				onclick={registerUser}
 				disabled={!userName || isRegistering}
 				class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
 			>
@@ -887,7 +889,8 @@
 															</div>
 															<div class="flex space-x-2">
 																<button
-																	on:click={() => toggleBlock(block.id)}
+																	aria-label="View transactions"
+																	onclick={() => toggleBlock(block.id)}
 																	class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
 																	title="View Transactions"
 																>
@@ -906,7 +909,8 @@
 																	</svg>
 																</button>
 																<button
-																	on:click={() => (selectedPreviousBlock = block)}
+																	aria-label="Select as previous block"
+																	onclick={() => (selectedPreviousBlock = block)}
 																	class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
 																	title="Select as Previous Block"
 																	disabled={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
@@ -962,7 +966,7 @@
 													
 													<!-- Block card -->
 													<div
-														class="cyberpunk-box rounded-lg p-4 hover:border-cyan-600 transition-colors"
+														class="cyberpunk-box rounded-lg p-4 hover:border-cyan-600 transition-colors max-w-80 text-sm"
 														class:cyberpunk-box-selected={selectedPreviousBlock && selectedPreviousBlock.hash === block.hash}
 														class:border-green-500={block.isInLongestChain}
 														class:border-yellow-500={!block.isInLongestChain}
@@ -1001,7 +1005,8 @@
 														</div>
 														<div class="flex space-x-2">
 															<button
-																on:click={() => toggleBlock(block.id)}
+																aria-label="View transactions"
+																onclick={() => toggleBlock(block.id)}
 																class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer"
 																title="View Transactions"
 															>
@@ -1020,7 +1025,8 @@
 																</svg>
 															</button>
 															<button
-																on:click={() => (selectedPreviousBlock = block)}
+																aria-label="Select as previous block"
+																onclick={() => (selectedPreviousBlock = block)}
 																class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer"
 																title="Select as Previous Block"
 																disabled={selectedPreviousBlock && selectedPreviousBlock.id === block.id}
@@ -1137,7 +1143,8 @@
 									class:bg-cyan-900={selectedTransactions.some(
 										(t) => t.id === tx.id,
 									)}
-									on:click={() => toggleTransaction(tx)}
+									aria-label="Add to block"
+									onclick={() => toggleTransaction(tx)}
 								>
 									<div>
 										<div class="text-sm">
@@ -1213,7 +1220,7 @@
 							type="number"
 							bind:value={nonce}
 							min="0"
-							on:input={updateHash}
+							oninput={updateHash}
 							disabled={isMining || autoMining}
 							class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500"
 						/>
@@ -1282,7 +1289,7 @@
 					<!-- Mining Buttons -->
 					<div class="flex space-x-4 mb-4">
 						<button
-							on:click={updateHash}
+							onclick={updateHash}
 							disabled={isMining || autoMining}
 							class="flex-1 py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
 						>
@@ -1290,7 +1297,7 @@
 						</button>
 
 						<button
-							on:click={autoMining
+							onclick={autoMining
 								? () => (autoMining = false)
 								: autoMineBlock}
 							disabled={isMining}
@@ -1302,7 +1309,7 @@
 
 					<!-- Broadcast Button -->
 					<button
-						on:click={mineBlock}
+						onclick={mineBlock}
 						disabled={isMining ||
 							autoMining ||
 							!isCurrentHashValid()}

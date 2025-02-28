@@ -41,7 +41,8 @@
 				
 				{#if $page.url.pathname.startsWith('/blockchain/') || $page.url.pathname.startsWith('/wallet/')}
 					<button 
-						on:click={logout}
+						aria-label="Logout"
+						onclick={logout}
 						class="text-cyan-400 hover:text-cyan-300 transition-colors"
 					>
 						Logout

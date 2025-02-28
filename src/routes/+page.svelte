@@ -122,7 +122,8 @@
 		<div class="w-full max-w-md bg-red-900 border border-red-700 text-red-300 p-3 rounded mb-4">
 			{error}
 			<button 
-				on:click={() => error = null} 
+				aria-label="Dismiss error"
+				onclick={() => error = null} 
 				class="ml-2 text-red-300 hover:text-red-200"
 			>
 				✕
@@ -150,7 +151,8 @@
 				{/if}
 				
 				<button 
-					on:click={enterPublicBlockchain} 
+					aria-label="Connect"
+					onclick={enterPublicBlockchain} 
 					disabled={isLoading || !publicBlockchain} 
 					class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
 				>
@@ -176,7 +178,8 @@
 				</div>
 				
 				<button 
-					on:click={connectToBlockchain} 
+					aria-label="Connect"
+					onclick={connectToBlockchain} 
 					disabled={isConnecting || !connectBlockchainName} 
 					class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
 				>
@@ -241,7 +244,8 @@
 				
 			{:else}
 				<button 
-					on:click={createNewBlockchain} 
+					aria-label="Create and connect"
+					onclick={createNewBlockchain} 
 					disabled={isCreating || !newBlockchainName} 
 					class="w-full py-2 px-4 bg-green-700 hover:bg-green-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
 				>
