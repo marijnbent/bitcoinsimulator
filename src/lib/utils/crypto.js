@@ -23,7 +23,7 @@ export function calculateBlockHash(block, transactions) {
 // Generate a key pair
 export function generateKeyPair() {
   // For educational purposes, we'll use a simplified approach
-  const privateKey = crypto.randomUUID();
+  const privateKey = sha256(crypto.randomUUID());
   const publicKey = sha256(privateKey);
   return { privateKey, publicKey };
 }
