@@ -273,6 +273,8 @@
 		isRegistering = true;
 
 		try {
+			console.log("Registering user with name:", userName);
+			
 			const response = await fetch(
 				`/api/blockchain/${blockchainId}/users`,
 				{
@@ -293,8 +295,10 @@
 			}
 
 			user = await response.json();
-			saveUser(user);
 
+			// Save user to localStorage
+			saveUser(user);
+			
 			// Clear form
 			userName = "";
 			error = null;
@@ -555,13 +559,13 @@
 			<div class="text-xl text-cyan-400">Loading blockchain data...</div>
 		</div>
 	{:else if !user}
-		<!-- User Registration Form -->
+		<!-- User Registration/Login Form -->
 		<div class="max-w-md mx-auto p-6 cyberpunk-box rounded-lg">
-			<h2 class="text-2xl font-bold mb-6 text-center">Create Account</h2>
+			<h2 class="text-2xl font-bold mb-6 text-center">Create or Login to Account</h2>
 
 			<p class="mb-4 text-cyan-500">
 				To interact with the blockchain, you need to create an account
-				first.
+				or login to an existing one.
 			</p>
 
 			<div class="mb-4">
@@ -586,7 +590,7 @@
 				disabled={!userName || isRegistering}
 				class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
 			>
-				{isRegistering ? "Creating Account..." : "Create Account"}
+				{isRegistering ? "Logging in..." : "Login / Create Account"}
 			</button>
 		</div>
 	{:else}

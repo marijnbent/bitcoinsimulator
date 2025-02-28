@@ -50,7 +50,7 @@
 		user = getUser(blockchainId);
 		
 		if (!user) {
-			// Redirect to blockchain page to create user
+			// Redirect to blockchain page to create/login user
 			goto(`/blockchain/${blockchainId}`);
 			return;
 		}

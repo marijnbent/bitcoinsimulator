@@ -6,6 +6,17 @@
 // Save user data to local storage
 export function saveUser(user) {
   if (typeof window !== 'undefined') {
+    if (!user || !user.blockchainId) {
+      console.error('Invalid user data:', user);
+      return;
+    }
+    
+    // Ensure the user has all required fields
+    if (!user.privateKey) {
+      console.error('User data missing privateKey:', user);
+    }
+    
+    console.log('Saving user to localStorage:', user);
     localStorage.setItem(`user_${user.blockchainId}`, JSON.stringify(user));
   }
 }
@@ -14,7 +25,9 @@ export function saveUser(user) {
 export function getUser(blockchainId) {
   if (typeof window !== 'undefined') {
     const userData = localStorage.getItem(`user_${blockchainId}`);
-    return userData ? JSON.parse(userData) : null;
+    const user = userData ? JSON.parse(userData) : null;
+    console.log('Retrieved user from localStorage:', user);
+    return user;
   }
   return null;
 }

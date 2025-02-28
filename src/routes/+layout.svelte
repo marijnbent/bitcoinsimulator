@@ -1,7 +1,7 @@
 <script>
 	import '../app.css';
 	import { page } from '$app/stores';
-	import { getCurrentBlockchain } from '$lib/utils/storage.js';
+	import { getCurrentBlockchain, removeUser } from '$lib/utils/storage.js';
 	
 	let { children } = $props();
 	
@@ -12,6 +12,14 @@
 		const isWalletPage = path.startsWith('/wallet/');
 		const isConnectedToBlockchain = isBlockchainPage || isWalletPage;
 	});
+	
+	// Logout function
+	function logout() {
+		if ($page.params.id) {
+			removeUser($page.params.id);
+		}
+		window.location.href = '/';
+	}
 </script>
 
 <div class="min-h-screen bg-gray-900 text-cyan-400 font-mono">
@@ -21,7 +29,7 @@
 				Bitcoin Simulator
 			</a>
 			
-			<nav class="flex space-x-6">
+			<nav class="flex space-x-6 text-sm">
 				{#if $page.url.pathname !== '/'}
 					<a 
 						href="/" 
@@ -29,6 +37,15 @@
 					>
 						Home
 					</a>
+				{/if}
+				
+				{#if $page.url.pathname.startsWith('/blockchain/') || $page.url.pathname.startsWith('/wallet/')}
+					<button 
+						on:click={logout}
+						class="text-cyan-400 hover:text-cyan-300 transition-colors"
+					>
+						Logout
+					</button>
 				{/if}
 			</nav>
 		</div>

@@ -23,6 +23,7 @@ export async function GET({ params }) {
       name: user.name,
       username: user.username,
       publicKey: user.publicKey,
+      privateKey: user.privateKey,
       blockchainId: user.blockchainId
     }).from(user).where(eq(user.blockchainId, id));
     
@@ -33,7 +34,7 @@ export async function GET({ params }) {
   }
 }
 
-// POST /api/blockchain/[id]/users - Create a new user
+// POST /api/blockchain/[id]/users - Create a new user or load existing user
 export async function POST({ params, request }) {
   try {
     const { id } = params;
@@ -52,11 +53,32 @@ export async function POST({ params, request }) {
       return json({ error: 'Blockchain not found' }, { status: 404 });
     }
     
-    // Generate a key pair
-    const { publicKey, privateKey } = generateKeyPair();
-    
     // Convert name to username
     const username = nameToUsername(data.name);
+    
+    // Check if a user with this username already exists for this blockchain
+    const existingUsers = await db.select()
+      .from(user)
+      .where(eq(user.blockchainId, id))
+      .where(eq(user.username, username));
+    
+    // If user exists, return the existing user
+    if (existingUsers.length > 0) {
+      const existingUser = existingUsers[0];
+      console.log(`User ${username} already exists, loading existing account`);
+      
+      return json({
+        id: existingUser.id,
+        name: existingUser.name,
+        username: existingUser.username,
+        publicKey: existingUser.publicKey,
+        blockchainId: existingUser.blockchainId,
+        privateKey: existingUser.privateKey // Include private key for client storage
+      });
+    }
+    
+    // If user doesn't exist, generate a key pair for the new user
+    const { publicKey, privateKey } = generateKeyPair();
     
     // Create a new user
     const newUser = {
@@ -71,7 +93,7 @@ export async function POST({ params, request }) {
     // Insert the user into the database
     await db.insert(user).values(newUser);
     
-    // Return the new user (without private key)
+    // Return the new user
     return json({
       id: newUser.id,
       name: newUser.name,
