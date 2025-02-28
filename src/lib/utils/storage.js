@@ -38,21 +38,3 @@ export function removeUser(blockchainId) {
     localStorage.removeItem(`user_${blockchainId}`);
   }
 }
-
-// These functions are kept for backward compatibility but use sessionStorage instead
-// to avoid persisting blockchain data in localStorage
-
-// Save current blockchain ID to session storage (temporary, only for current session)
-export function saveCurrentBlockchain(blockchainId) {
-  if (typeof window !== 'undefined') {
-    sessionStorage.setItem('current_blockchain', blockchainId);
-  }
-}
-
-// Get current blockchain ID from session storage
-export function getCurrentBlockchain() {
-  if (typeof window !== 'undefined') {
-    return sessionStorage.getItem('current_blockchain');
-  }
-  return null;
-}

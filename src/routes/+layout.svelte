@@ -1,7 +1,7 @@
 <script>
 	import '../app.css';
 	import { page } from '$app/stores';
-	import { getCurrentBlockchain, removeUser } from '$lib/utils/storage.js';
+	import { removeUser } from '$lib/utils/storage.js';
 	
 	let { children } = $props();
 	
@@ -79,7 +79,7 @@
 	
 	<footer class="bg-gray-800 border-t border-cyan-700 p-4 mt-8">
 		<div class="container mx-auto text-center text-cyan-600">
-			<p>Bitcoin Simulator - Educational Tool</p>
+			<p>Bitcoin Simulator - ©️ Marijn Bent</p>
 		</div>
 	</footer>
 </div>

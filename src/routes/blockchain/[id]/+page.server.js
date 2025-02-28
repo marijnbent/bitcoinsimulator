@@ -16,7 +16,7 @@ export async function load({ params }) {
 		
 		// Get all blocks for the blockchain
 		const blocks = await db.select().from(block).where(eq(block.blockchainId, id));
-		
+
 		// Get all transactions for the blockchain
 		const transactions = await db.select().from(transaction).where(eq(transaction.blockchainId, id));
 		
@@ -28,10 +28,10 @@ export async function load({ params }) {
 			publicKey: user.publicKey,
 			blockchainId: user.blockchainId
 		}).from(user).where(eq(user.blockchainId, id));
-		
-		// Get mempool transactions
+
+		// Get mempool transactions for this blockchain only
 		const mempool = transactions.filter(tx => tx.inMempool);
-		
+
 		// Group transactions by block
 		const blockTransactions = {};
 		for (const tx of transactions) {
