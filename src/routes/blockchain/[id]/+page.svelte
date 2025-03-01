@@ -18,7 +18,6 @@
 	// State
 	let blockchain = $state(null);
 	let blocks = $state([]);
-	let blockTree = $state([]); // Organized blocks with height and fork information
 	let mempool = $state([]);
 	let users = $state([]);
 	let user = $state(null);
@@ -40,13 +39,6 @@
 	let generatedHashes = $state([]);
 	const maxHashesToShow = 4;
 
-	// Build the block tree structure when blocks are loaded or updated
-	$effect(() => {
-		if (blocks.length > 0) {
-			buildBlockTree();
-		}
-	});
-
 	// Set the latest block as the default previous block when blocks are loaded
 	$effect(() => {
 		if (blocks.length > 0 && !selectedPreviousBlock) {
@@ -59,261 +51,6 @@
 		}
 	});
 
-	// Function to build the block tree structure with chains and forks
-	function buildBlockTree() {
-		// Create a map of blocks by hash for quick lookup
-		const blocksByHash = {};
-		blocks.forEach((block) => {
-			blocksByHash[block.hash] = { 
-				...block, 
-				children: [], 
-				height: -1,
-				isInLongestChain: false, // Flag for blocks in the longest chain
-				forkParent: null, // Hash of the block this fork branches from
-				column: -1, // Column position in the grid (based on height)
-				row: -1 // Row position in the grid (0 for main chain, 1+ for forks)
-			};
-		});
-
-		// Find the genesis block (the one with no previous hash or self-referential)
-		let genesisBlock = blocks.find(
-			(block) => !block.previousHash || block.previousHash === block.hash,
-		);
-
-		if (!genesisBlock && blocks.length > 0) {
-			// If no genesis block found, use the oldest block as genesis
-			genesisBlock = blocks.reduce(
-				(oldest, block) =>
-					block.minedAt < oldest.minedAt ? block : oldest,
-				blocks[0],
-			);
-		}
-
-		// If no blocks, return empty tree
-		if (!genesisBlock) {
-			blockTree = [];
-			return;
-		}
-
-		// Build the tree structure by connecting blocks through previousHash
-		blocks.forEach((block) => {
-			if (
-				block.hash !== genesisBlock.hash &&
-				block.previousHash &&
-				blocksByHash[block.previousHash]
-			) {
-				blocksByHash[block.previousHash].children.push(
-					blocksByHash[block.hash],
-				);
-			}
-		});
-
-		// Assign heights using BFS traversal
-		const queue = [{ block: blocksByHash[genesisBlock.hash], height: 0 }];
-		const processed = new Set();
-
-		while (queue.length > 0) {
-			const { block, height } = queue.shift();
-
-			// Skip if already processed with a lower height
-			if (processed.has(block.hash) && block.height <= height) {
-				continue;
-			}
-
-			// Assign height and mark as processed
-			block.height = height;
-			block.column = height; // Column position is based on height
-			processed.add(block.hash);
-
-			// Add children to queue
-			block.children.forEach((child) => {
-				queue.push({ block: child, height: height + 1 });
-			});
-		}
-
-		// Find the longest chain and mark blocks in it
-		let longestChainTip = null;
-		let maxHeight = -1;
-
-		// Find the tip of the longest chain
-		Object.values(blocksByHash).forEach(block => {
-			if (block.height > maxHeight) {
-				maxHeight = block.height;
-				longestChainTip = block;
-			}
-		});
-
-		// Mark all blocks in the longest chain
-		if (longestChainTip) {
-			let current = longestChainTip;
-			while (current) {
-				current.isInLongestChain = true;
-				current.row = 0; // Main chain is always in row 0
-				// Move to parent block
-				current = current.previousHash && blocksByHash[current.previousHash];
-			}
-		}
-
-		// Find fork points and assign rows to fork chains
-		let nextForkRow = 1;
-		const forkPoints = [];
-		
-		// Identify all fork points (blocks with multiple children)
-		Object.values(blocksByHash).forEach(block => {
-			if (block.children.length > 1) {
-				// Sort children: longest chain first, then by height
-				block.children.sort((a, b) => {
-					if (a.isInLongestChain && !b.isInLongestChain) return -1;
-					if (!a.isInLongestChain && b.isInLongestChain) return 1;
-					return b.height - a.height;
-				});
-				
-				// The first child is part of the main chain, the rest are forks
-				const forkChildren = block.children.filter(child => !child.isInLongestChain);
-				
-				if (forkChildren.length > 0) {
-					forkPoints.push({
-						parent: block,
-						forkChildren
-					});
-				}
-			}
-		});
-		
-		// Create a map to track which columns are occupied in each row
-		// This helps us reuse rows when possible
-		const occupiedPositions = new Map();
-		
-		// Helper function to check if a position is available
-		const isPositionAvailable = (row, column) => {
-			const key = `${row},${column}`;
-			return !occupiedPositions.has(key);
-		};
-		
-		// Helper function to mark a position as occupied
-		const markPositionOccupied = (row, column) => {
-			const key = `${row},${column}`;
-			occupiedPositions.set(key, true);
-		};
-		
-		// Helper function to find the first available row for a fork chain
-		const findAvailableRow = (startColumn, endColumn) => {
-			let row = 1;
-			while (true) {
-				let rowAvailable = true;
-				
-				// Check if all positions in this row from startColumn to endColumn are available
-				for (let col = startColumn; col <= endColumn; col++) {
-					if (!isPositionAvailable(row, col)) {
-						rowAvailable = false;
-						break;
-					}
-				}
-				
-				if (rowAvailable) {
-					return row;
-				}
-				
-				row++;
-			}
-		};
-		
-		// Process each fork point
-		forkPoints.forEach(({ parent, forkChildren }) => {
-			// Group forks by their end column (height)
-			const forksByEndColumn = new Map();
-			
-			// First, determine the end column for each fork chain
-			forkChildren.forEach(forkChild => {
-				// Mark this fork child as a fork
-				forkChild.forkParent = parent.hash;
-				
-				// Find the end of this fork chain
-				let endColumn = forkChild.column;
-				let current = forkChild;
-				const processed = new Set([current.hash]);
-				
-				// Process all descendants of this fork to find the furthest one
-				const queue = [current];
-				while (queue.length > 0) {
-					const block = queue.shift();
-					
-					if (block.column > endColumn) {
-						endColumn = block.column;
-					}
-					
-					// Process all children
-					block.children.forEach(child => {
-						if (!processed.has(child.hash)) {
-							processed.add(child.hash);
-							queue.push(child);
-						}
-					});
-				}
-				
-				// Group by end column
-				if (!forksByEndColumn.has(endColumn)) {
-					forksByEndColumn.set(endColumn, []);
-				}
-				forksByEndColumn.get(endColumn).push({
-					startBlock: forkChild,
-					endColumn,
-					blocks: Array.from(processed).map(hash => blocksByHash[hash])
-				});
-			});
-			
-			// Now assign rows to forks, trying to reuse rows when possible
-			Array.from(forksByEndColumn.entries())
-				.sort((a, b) => b[0] - a[0]) // Sort by end column descending (longest forks first)
-				.forEach(([endColumn, forks]) => {
-					forks.forEach(fork => {
-						const startColumn = fork.startBlock.column;
-						
-						// Find an available row for this fork
-						const rowForThisFork = findAvailableRow(startColumn, endColumn);
-						
-						// Mark all positions in this fork chain as occupied
-						for (let col = startColumn; col <= endColumn; col++) {
-							markPositionOccupied(rowForThisFork, col);
-						}
-						
-						// Assign the row to all blocks in this fork chain
-						fork.blocks.forEach(block => {
-							block.row = rowForThisFork;
-						});
-					});
-				});
-		});
-		
-		// Create a grid structure for the blocks
-		// First, determine the maximum height and row
-		const maxColumn = maxHeight;
-		
-		// Find the maximum row used by any block
-		let maxRow = 0;
-		Object.values(blocksByHash).forEach(block => {
-			if (block.row > maxRow) {
-				maxRow = block.row;
-			}
-		});
-		
-		// Create a 2D grid with empty cells (ensure at least one row)
-		const grid = Array(Math.max(maxRow + 1, 1)).fill().map(() => Array(maxColumn + 1).fill(null));
-		
-		// Place blocks in the grid
-		Object.values(blocksByHash).forEach(block => {
-			if (block.row >= 0 && block.column >= 0) {
-				grid[block.row][block.column] = block;
-			}
-		});
-		
-		blockTree = {
-			grid,
-			maxRow,
-			maxColumn,
-			blocksByHash
-		};
-	}
 
 	// Create update store
 	const updateStore = createUpdateStore(blockchainId, {
@@ -814,9 +551,8 @@
 			</div>
 
 			<!-- Blockchain Visualization Component -->
-			<BlockchainVisualization 
+			<BlockchainVisualization
 				{blocks}
-				{blockTree}
 				{expandedBlockId}
 				{selectedPreviousBlock}
 				{blockchainId}
