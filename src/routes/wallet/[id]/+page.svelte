@@ -40,7 +40,7 @@
 
 	// Subscribe to updates
 	const unsubscribe = updateStore.subscribe((data) => {
-		if (data.blocks) {
+		if (data.blocks && data.blocks.length > 0) {
 			blocks = data.blocks;
 
 			longestChainBlocks = getLongestChainBlocks(blocks);
@@ -64,6 +64,9 @@
 		}
 	});
 
+	// Get data from server-side load function
+	export let data;
+
 	// Load blockchain and user data
 	onMount(async () => {
 		// Check if user exists for this blockchain
@@ -75,28 +78,25 @@
 		}
 
 		try {
-			// Fetch blockchain data
-			const blockchainResponse = await fetch(
-				`/api/blockchain/${blockchainId}`,
-			);
-			if (!blockchainResponse.ok) {
-				throw new Error(
-					`Failed to fetch blockchain: ${blockchainResponse.statusText}`,
-				);
-			}
-
-			blockchain = await blockchainResponse.json();
-
-			// Fetch users
-			const usersResponse = await fetch(
-				`/api/blockchain/${blockchainId}/users`,
-			);
-			if (!usersResponse.ok) {
-				throw new Error(
-					`Failed to fetch users: ${usersResponse.statusText}`,
-				);
-			}
-			users = await usersResponse.json();
+			// Use data from server-side load function
+			blockchain = data.blockchain;
+			users = data.users;
+			
+			// Initialize blocks from server data
+			blocks = data.blocks;
+			
+			// Calculate longest chain blocks
+			longestChainBlocks = getLongestChainBlocks(blocks);
+			
+			// Update mined blocks
+			minedBlocks = blocks
+				.filter((block) => block.minerId === user.id)
+				.map((block) => ({
+					...block,
+					inLongestChain: longestChainBlocks.includes(block.id),
+					reward: blockchain.blockReward,
+				}))
+				.sort((a, b) => b.minedAt - a.minedAt);
 
 			// Update balance and transactions
 			updateBalance();
