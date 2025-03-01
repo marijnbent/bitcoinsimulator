@@ -837,7 +837,7 @@
 						</p>
 					{:else}
 						<div
-							class="space-y-2 max-h-[300px] overflow-y-auto pr-2"
+							class="space-y-2 max-h-[400px] overflow-y-auto pr-2"
 						>
 							{#each mempool as tx (tx.id)}
 								<div

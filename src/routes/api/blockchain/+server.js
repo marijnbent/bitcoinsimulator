@@ -107,12 +107,22 @@ async function createBlockchain(data) {
     senderId: null, // Coinbase transaction has no sender
     recipientId: satoshiUser.id,
     amount: 10, // Genesis block reward is 10 BTC
-    createdAt: Date.now(),
-    inMempool: false
+    createdAt: Date.now()
   };
-  
-  // Insert coinbase transaction into the database
-  await db.insert(transaction).values(coinbaseTransaction);
+
+  // Create 5 random transactions
+  const randomTransactions = Array.from({ length: 5 }, () => ({
+    id: crypto.randomUUID(),
+    blockchainId: newBlockchain.id,
+    blockId: null,
+    senderId: satoshiUser.id,
+    recipientId: satoshiUser.id,
+    amount: Number((Math.random() * 2).toFixed(8)), // Random amount between 0 and 2
+    createdAt: Date.now()
+  }));
+
+  // Insert all transactions into the database
+  await db.insert(transaction).values([coinbaseTransaction, ...randomTransactions]);
   
   return newBlockchain;
 }

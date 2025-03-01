@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { blockchain, transaction, user } from '$lib/server/db/schema';
-import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, inArray, desc } from 'drizzle-orm';
 
 // GET /api/blockchain/[id]/transactions - Get all transactions for a blockchain
 export async function GET({ params, url }) {
@@ -17,12 +17,12 @@ export async function GET({ params, url }) {
       return json({ error: 'Blockchain not found' }, { status: 404 });
     }
 
-    // Get all transactions for the blockchain
-		let transactions = await db.select().from(transaction).where(eq(transaction.blockchainId, id));
+    let transactions = await db.select().from(transaction).where(eq(transaction.blockchainId, id)).orderBy(desc(transaction.createdAt));
 
-    // Filter by mempool if requested
+
+    // Get all transactions for the blockchain
     if (mempoolOnly) {
-      transactions = transactions.filter(tx => tx.inMempool);
+      transactions = transactions.filter(tx => tx.blockId === null);
     }
 
     // Get all users for the transactions
@@ -108,8 +108,7 @@ export async function POST({ params, request }) {
       senderId: data.senderId,
       recipientId: data.recipientId,
       amount: data.amount,
-      createdAt: Date.now(),
-      inMempool: true
+      createdAt: Date.now()
     };
 
     // Insert the transaction into the database

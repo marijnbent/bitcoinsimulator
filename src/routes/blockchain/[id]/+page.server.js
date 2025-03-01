@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { blockchain, block, transaction, user } from '$lib/server/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 
 export async function load({ params }) {
 	try {
@@ -18,7 +18,10 @@ export async function load({ params }) {
 		const blocks = await db.select().from(block).where(eq(block.blockchainId, id));
 
 		// Get all transactions for the blockchain
-		const transactions = await db.select().from(transaction).where(eq(transaction.blockchainId, id));
+		const transactions = await db.select()
+			.from(transaction)
+			.where(eq(transaction.blockchainId, id))
+			.orderBy(desc(transaction.createdAt));
 		
 		// Get all users for the blockchain
 		const users = await db.select({
@@ -30,7 +33,7 @@ export async function load({ params }) {
 		}).from(user).where(eq(user.blockchainId, id));
 
 		// Get mempool transactions for this blockchain only
-		const mempool = transactions.filter(tx => tx.inMempool);
+		const mempool = transactions.filter(tx => tx.blockId === null);
 
 		// Group transactions by block
 		const blockTransactions = {};

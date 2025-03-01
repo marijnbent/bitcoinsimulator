@@ -27,7 +27,6 @@ export const transaction = sqliteTable('transaction', {
 	recipientId: text('recipient_id').references(() => user.id),
 	amount: real('amount').notNull(),
 	createdAt: integer('created_at').notNull(),
-	inMempool: integer('in_mempool', { mode: 'boolean' }).notNull().default(true)
 });
 
 export const user = sqliteTable('user', {

@@ -18,7 +18,7 @@
 	// Logout function
 	function logout() {
 		removeUser(blockchainId);
-		goto('/');
+		goto(`/`);
 	}
 </script>
 

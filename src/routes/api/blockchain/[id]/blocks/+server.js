@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { blockchain, block, transaction, user } from '$lib/server/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, isNull, desc } from 'drizzle-orm';
 import { calculateBlockHash, isValidHash } from '$lib/utils/crypto.js';
 
 // GET /api/blockchain/[id]/blocks - Get all blocks for a blockchain
@@ -89,8 +89,8 @@ export async function POST({ params, request }) {
 
     const currentBlockchain = blockchains[0];
 
-     // Validate the hash (only if there are transactions)
-     if (!isValidHash(data.hash, currentBlockchain.leadingZeros)) {
+    // Validate the hash (only if there are transactions)
+    if (!isValidHash(data.hash, currentBlockchain.leadingZeros)) {
       return json({ error: 'Invalid hash' }, { status: 400 });
     }
 
@@ -137,7 +137,7 @@ export async function POST({ params, request }) {
       .where(
         and(
           eq(transaction.blockchainId, id),
-          eq(transaction.inMempool, true)
+          isNull(transaction.blockId)
         )
       );
 
@@ -172,7 +172,6 @@ export async function POST({ params, request }) {
       await db.update(transaction)
         .set({
           blockId: newBlock.id,
-          inMempool: false
         })
         .where(eq(transaction.id, tx.id));
     }
@@ -187,19 +186,19 @@ export async function POST({ params, request }) {
       if (tx.senderId) userIds.add(tx.senderId);
       if (tx.recipientId) userIds.add(tx.recipientId);
     }
-    
+
     const users = await db.select().from(user).where(
       userIds.size > 0
         ? inArray(user.id, [...userIds])
         : undefined
     );
-    
+
     // Create a map of user IDs to usernames
     const userMap = {};
     for (const u of users) {
       userMap[u.id] = u.username;
     }
-    
+
     // Add usernames to transactions
     const transactionsWithUsernames = includedTransactions.map(tx => ({
       ...tx,
