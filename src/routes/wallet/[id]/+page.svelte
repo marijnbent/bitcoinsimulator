@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { getUser, saveUser } from '$lib/utils/storage.js';
+	import { getUser } from '$lib/utils/storage.js';
 	import { createUpdateStore } from '$lib/utils/updates.js';
 	import { calculateBalance } from '$lib/utils/mining.js';
 	
@@ -50,7 +50,6 @@
 		user = getUser(blockchainId);
 		
 		if (!user) {
-			// Redirect to blockchain page to create/login user
 			goto(`/blockchain/${blockchainId}`);
 			return;
 		}
@@ -291,6 +290,7 @@
 						<h2 class="text-xl font-bold mb-2">Your Account</h2>
 						<p class="text-cyan-500">Name: <span class="text-cyan-300">{user.name}</span></p>
 						<p class="text-cyan-500">Username: <span class="text-cyan-300">{user.username}</span></p>
+						<p class="text-cyan-500">Chain ID: <span class="text-cyan-300">{user.blockchainId}</span></p>
 					</div>
 					
 					<div class="mt-4 md:mt-0 text-center">

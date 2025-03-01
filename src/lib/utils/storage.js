@@ -16,7 +16,6 @@ export function saveUser(user) {
       console.error('User data missing privateKey:', user);
     }
     
-    console.log('Saving user to localStorage:', user);
     localStorage.setItem(`user_${user.blockchainId}`, JSON.stringify(user));
   }
 }
@@ -26,7 +25,7 @@ export function getUser(blockchainId) {
   if (typeof window !== 'undefined') {
     const userData = localStorage.getItem(`user_${blockchainId}`);
     const user = userData ? JSON.parse(userData) : null;
-    console.log('Retrieved user from localStorage:', user);
+
     return user;
   }
   return null;

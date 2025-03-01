@@ -2,8 +2,10 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	import { removeUser } from '$lib/utils/storage.js';
+    import { goto } from '$app/navigation';
 	
 	let { children } = $props();
+	const blockchainId = $page.params.id;
 	
 	// Check if we're on a blockchain or wallet page
 	$effect(() => {
@@ -15,10 +17,8 @@
 	
 	// Logout function
 	function logout() {
-		if ($page.params.id) {
-			removeUser($page.params.id);
-		}
-		window.location.href = '/';
+		removeUser(blockchainId);
+		goto('/');
 	}
 </script>
 

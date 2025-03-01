@@ -93,9 +93,7 @@
 			// Sort by height to ensure correct order
 			longestChainBlocks.sort((a, b) => a.block.height - b.block.height);
 			
-			console.log(`Row ${row} has ${longestChainBlocks.length} blocks in longest chain`);
 			longestChainBlocks.forEach((rb, idx) => {
-				console.log(`  Block ${idx}: height=${rb.block.height}, col=${rb.col}`);
 			});
 			
 			// Draw connections between consecutive blocks in the longest chain
@@ -103,8 +101,6 @@
 				const source = longestChainBlocks[i];
 				const target = longestChainBlocks[i + 1];
 				
-				console.log(`Connecting blocks: ${source.block.height} -> ${target.block.height}`);
-
 				// Calculate positions with reversed columns
 				const reversedSourceCol = maxColumn - source.col;
 				const reversedTargetCol = maxColumn - target.col;

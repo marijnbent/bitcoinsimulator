@@ -9,9 +9,6 @@ export async function GET({ params, url }) {
     const { id } = params;
     const mempoolOnly = url.searchParams.get('mempool') === 'true';
 
-    console.log("get transactions")
-    console.log(id)
-
     // Get the blockchain from the database
     const blockchains = await db.select().from(blockchain).where(eq(blockchain.id, id));
 

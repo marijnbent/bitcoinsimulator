@@ -362,7 +362,7 @@
 
 	// Load blockchain and user data
 	onMount(async () => {
-		// Check if user exists for this blockchain
+
 		user = getUser(blockchainId);
 
 		try {
