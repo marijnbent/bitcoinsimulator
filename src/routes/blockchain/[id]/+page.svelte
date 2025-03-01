@@ -38,10 +38,7 @@
 	let autoMining = $state(false);
 	let selectedPreviousBlock = $state(null);
 	let generatedHashes = $state([]);
-	const maxHashesToShow = 5;
-
-	// State for controlling fork display
-	let showAllForks = $state(false);
+	const maxHashesToShow = 4;
 
 	// Build the block tree structure when blocks are loaded or updated
 	$effect(() => {
@@ -657,6 +654,10 @@
 		return `${Math.floor(seconds / 86400)} days ago`;
 	}
 
+	async function selectPreviousBlock(block) {
+		selectedPreviousBlock = block;
+	}
+
 	// Toggle block expansion
 	async function toggleBlock(blockId) {
 		if (expandedBlockId === blockId) {
@@ -821,6 +822,7 @@
 				{blockchainId}
 				{toggleBlock}
 				{timeAgo}
+				{selectPreviousBlock}
 			/>
 
 			<!-- Mining Interface -->
@@ -946,7 +948,7 @@
 						>
 					</div>
 
-					Selected: {selectedTransactions.length} transactions
+					<span class="block mb-2">Selected: {selectedTransactions.length} transactions</span>
 
 					<!-- Generated Hashes -->
 					{#if generatedHashes.length > 0}

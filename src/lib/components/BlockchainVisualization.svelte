@@ -10,6 +10,7 @@
 
 	// Functions that need to be passed from parent
 	export let toggleBlock;
+	export let selectPreviousBlock;
 	export let timeAgo;
 
 	// State for showing all rows or limiting to 2
@@ -296,6 +297,8 @@
 			if (block) {
 				selectedPreviousBlock = block;
 			}
+
+			selectPreviousBlock(block);
 		});
 	}
 	
