@@ -2,6 +2,7 @@
  * Utility functions for mining operations in the Bitcoin simulator
  */
 
+import { getLongestChainBlocks } from './blockchain.js';
 import { calculateBlockHash, isValidHash } from './crypto.js';
 
 // Mine a block with the given transactions and difficulty
@@ -40,27 +41,29 @@ export async function mineBlock(block, transactions, leadingZeros) {
 export function calculateBalance(userId, blocks, blockReward) {
   let balance = 0;
   
-  // Process all blocks
-  for (const block of blocks) {
+  const longestChainBlocks = getLongestChainBlocks(blocks);
+  const filteredBlocks = blocks.filter(block => longestChainBlocks.includes(block.id));
+
+  for (const block of filteredBlocks) {
     // Add block rewards for blocks mined by this user
     if (block.minerId === userId) {
       balance += blockReward;
     }
-    
+
     // Process all transactions in this block
     for (const tx of block.transactions || []) {
       // Subtract amounts sent by this user
       if (tx.senderId === userId) {
         balance -= tx.amount;
       }
-      
+
       // Add amounts received by this user
       if (tx.recipientId === userId) {
         balance += tx.amount;
       }
     }
   }
-  
+
   return balance;
 }
 

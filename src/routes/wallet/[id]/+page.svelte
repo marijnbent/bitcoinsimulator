@@ -5,6 +5,7 @@
 	import { getUser } from '$lib/utils/storage.js';
 	import { createUpdateStore } from '$lib/utils/updates.js';
 	import { calculateBalance } from '$lib/utils/mining.js';
+    import { getLongestChainBlocks } from '$lib/utils/blockchain';
 	
 	// Get blockchain ID from URL
 	const blockchainId = $page.params.id;
@@ -100,7 +101,7 @@
 	// Update user balance
 	function updateBalance() {
 		if (!blockchain || !user || !blocks) return;
-		
+
 		balance = calculateBalance(user.id, blocks, blockchain.blockReward);
 	}
 	
