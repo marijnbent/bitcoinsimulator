@@ -40,26 +40,28 @@
 
 	// Subscribe to updates
 	const unsubscribe = updateStore.subscribe((data) => {
-		if (data.blocks && data.blocks.length > 0) {
+		if (data && data.blocks && data.blocks.length > 0) {
 			blocks = data.blocks;
 
 			longestChainBlocks = getLongestChainBlocks(blocks);
 
-			minedBlocks = blocks
-				.filter((block) => block.minerId === user.id)
-				.map((block) => ({
-					...block,
-					inLongestChain: longestChainBlocks.includes(block.id),
-					reward: blockchain.blockReward,
-				}))
-				.sort((a, b) => b.minedAt - a.minedAt);
+			if (user) {
+				minedBlocks = blocks
+					.filter((block) => block.minerId === user.id)
+					.map((block) => ({
+						...block,
+						inLongestChain: longestChainBlocks.includes(block.id),
+						reward: blockchain?.blockReward || 0,
+					}))
+					.sort((a, b) => b.minedAt - a.minedAt);
+			}
 
 			updateBalance();
 		}
-		if (data.transactions) {
+		if (data && data.transactions) {
 			updateTransactions();
 		}
-		if (data.maxHeight !== undefined) {
+		if (data && data.maxHeight !== undefined) {
 			maxBlockHeight = data.maxHeight;
 		}
 	});
@@ -319,7 +321,7 @@
 				<h1 class="text-3xl font-bold cyberpunk-glow">Wallet</h1>
 
 				<div class="text-cyan-500">
-					<span>Blockchain: {blockchain.name}</span>
+					<span>Blockchain: {blockchain?.name || 'Unknown'}</span>
 				</div>
 			</div>
 
@@ -359,24 +361,26 @@
 				<h2 class="text-xl font-bold mb-4">Send Transaction</h2>
 
 				<div class="flex flex-wrap gap-2 mb-6">
-					{#each users.filter((u) => u.id !== user.id) as otherUser}
-						<button
-							class="px-3 py-1 text-sm rounded-full transition-colors"
-							class:bg-cyan-700={recipient === otherUser.username}
-							class:text-white={recipient === otherUser.username}
-							class:bg-gray-800={recipient !== otherUser.username}
-							class:text-cyan-400={recipient !==
-								otherUser.username}
-							class:border-cyan-600={recipient !==
-								otherUser.username}
-							class:border={recipient !== otherUser.username}
-							class:hover:bg-cyan-800={recipient !==
-								otherUser.username}
-							onclick={() => (recipient = otherUser.username)}
-						>
-							{otherUser.username}
-						</button>
-					{/each}
+					{#if users && users.length > 0}
+						{#each users.filter((u) => u && u.id !== user.id) as otherUser}
+							<button
+								class="px-3 py-1 text-sm rounded-full transition-colors"
+								class:bg-cyan-700={recipient === otherUser.username}
+								class:text-white={recipient === otherUser.username}
+								class:bg-gray-800={recipient !== otherUser.username}
+								class:text-cyan-400={recipient !==
+									otherUser.username}
+								class:border-cyan-600={recipient !==
+									otherUser.username}
+								class:border={recipient !== otherUser.username}
+								class:hover:bg-cyan-800={recipient !==
+									otherUser.username}
+								onclick={() => (recipient = otherUser.username)}
+							>
+								{otherUser.username}
+							</button>
+						{/each}
+					{/if}
 				</div>
 
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -425,7 +429,7 @@
 			<div class="p-6 cyberpunk-box rounded-lg">
 				<h2 class="text-xl font-bold mb-4">Transaction History</h2>
 
-				{#if transactions.length === 0}
+				{#if !transactions || transactions.length === 0}
 					<p class="text-cyan-500">No transactions yet.</p>
 				{:else}
 					<div class="overflow-x-auto">
@@ -522,7 +526,7 @@
 			<div class="mt-6 p-6 cyberpunk-box rounded-lg">
 				<h2 class="text-xl font-bold mb-4">Block History</h2>
 
-				{#if minedBlocks.length === 0}
+				{#if !minedBlocks || minedBlocks.length === 0}
 					<p class="text-cyan-500">
 						You haven't mined any blocks yet.
 					</p>
