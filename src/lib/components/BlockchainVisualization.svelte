@@ -499,11 +499,11 @@
 							</div>
 							<div class="mb-1">
 								<span class="text-cyan-500">Hash:</span>
-								<span class="text-xs text-cyan-300 break-all">${block.hash.substring(0, 8)}...</span>
+								<span class="text-xs text-cyan-300 break-all">${block.hash.substring(0, 10)}...</span>
 							</div>
 							<div class="mb-1">
 								<span class="text-cyan-500">Previous:</span>
-								<span class="text-xs text-cyan-300 break-all">${block.previousHash.substring(0, 8)}...</span>
+								<span class="text-xs text-cyan-300 break-all">${block.previousHash.substring(0, 10)}...</span>
 							</div>
 							<div class="mb-1">
 								<span class="text-cyan-500">Miner:</span>

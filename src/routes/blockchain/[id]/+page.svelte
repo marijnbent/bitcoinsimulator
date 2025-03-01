@@ -630,7 +630,7 @@
 									<span class="text-cyan-300"
 										>Hash: {selectedPreviousBlock.hash.substring(
 											0,
-											16,
+											10,
 										)}...</span
 									>
 									<span class="text-cyan-600"
