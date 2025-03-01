@@ -1,6 +1,7 @@
 <script>
 	import { onMount, afterUpdate } from 'svelte';
 	import * as d3 from 'd3';
+	
 
 	// Props
 	export let blocks = [];
