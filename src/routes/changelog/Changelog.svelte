@@ -8,7 +8,7 @@
 </svelte:head>
 
 <section class="container mx-auto mt-8 p-4">
-  <h1 class="text-2xl font-bold mb-4 cyberpunk-glow">Changelog</h1>
+  <h1 class="text-2xl font-bold mb-8 cyberpunk-glow">Changelog</h1>
 
   <div class="mb-6">
     <h2 class="text-xl font-semibold mb-2 cyberpunk-glow">Version 1.0.1</h2>
