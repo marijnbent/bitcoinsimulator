@@ -12,7 +12,8 @@
 
   <div class="mb-6">
     <h2 class="text-xl font-semibold mb-2 cyberpunk-glow">Version 1.0.1</h2>
-     <ul class="list-disc pl-5">
+      <span class="text-sm">Released on 2025-03-03</span>
+     <ul class="list-disc pl-5 pt-2">
       <li><strong>Bug fix:</strong> Fixed logout bug.</li>
       <li><strong>Enhancement:</strong> Added scrollbar styling.</li>
       <li><strong>Enhancement:</strong> Transaction handling improvements, mostly related to transactions to the same user.</li>
@@ -21,7 +22,8 @@
 
   <div class="mb-6">
     <h2 class="text-xl font-semibold mb-2 cyberpunk-glow">Version 1.0</h2>
-    <ul class="list-disc pl-5">
+    <span class="text-sm">Released on 2025-03-01</span>
+    <ul class="list-disc pl-5 pt-2">
       <li><strong>Blockchain Simulation:</strong> Core engine for simulating blockchain operations</li>
       <li><strong>Wallet Management:</strong> Create, manage, and interact with multiple wallets</li>
       <li><strong>Transaction System:</strong> Send and receive Bitcoin transactions within the simulation</li>
