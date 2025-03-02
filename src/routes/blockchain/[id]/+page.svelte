@@ -185,9 +185,9 @@
 			);
 
 			if (!response.ok) {
-				throw new Error(
-					`Failed to register user: ${response.statusText}`,
-				);
+				const responseData = await response.json();
+				error = responseData.error || `Failed to register user: ${response.statusText}`;
+				return;
 			}
 
 			user = await response.json();
