@@ -257,9 +257,11 @@
 			);
 
 			if (!response.ok) {
-				throw new Error(
-					`Failed to send transaction: ${response.statusText}`,
-				);
+				const responseData = await response.json();
+				error =
+					responseData.error ||
+					`Failed to send transaction: ${response.statusText}`;
+				return;
 			}
 
 			// Get the new transaction
