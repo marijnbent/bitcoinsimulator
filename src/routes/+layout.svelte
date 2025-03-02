@@ -29,7 +29,7 @@
 				Bitcoin Simulator
 			</a>
 			
-			<nav class="flex space-x-6 text-sm">
+			<nav class="flex space-x-6 text-sm items-center">
 				{#if $page.url.pathname !== '/'}
 					<a 
 						href="/" 
@@ -38,12 +38,18 @@
 						Home
 					</a>
 				{/if}
+				    <a
+				      href="/changelog"
+				      class="text-cyan-400 hover:text-cyan-300 transition-colors"
+				    >
+				      Changelog
+				    </a>
 				
 				{#if $page.url.pathname.startsWith('/blockchain/') || $page.url.pathname.startsWith('/wallet/')}
-					<button 
+					<button
 						aria-label="Logout"
 						onclick={logout}
-						class="text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
+						class="text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer border border-cyan-400 rounded-md px-2 py-1 hover:bg-transparent"
 					>
 						Logout
 					</button>
