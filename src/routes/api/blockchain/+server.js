@@ -16,7 +16,7 @@ export async function GET() {
     if (!publicBlockchain) {
       const newPublicBlockchain = await createBlockchain({
         name: 'Public',
-        leadingZeros: 8,
+        leadingZeros: 5,
         blockReward: 3.125
       });
       
