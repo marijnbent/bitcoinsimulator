@@ -453,11 +453,12 @@
 									<tr
 										class="border-b border-cyan-900 hover:bg-gray-800"
 									>
-										<td class="p-2">
-											{#if isSender}
-												<span class="text-red-400"
-													>Sent</span
-												>
+										<td class="p-2 {tx.status === 'forked' ? 'line-through' : ''}">
+											{#if isSender && isRecipient}
+												<span class="text-red-400 text-xs">Sent</span>
+												<span class="text-green-400 text-xs">Received</span>	
+											{:else if isSender}
+												<span class="text-red-400">Sent</span>
 											{:else if isRecipient}
 												<span class="text-green-400"
 													>Received</span
@@ -469,7 +470,9 @@
 											{/if}
 										</td>
 										<td class="p-2 text-cyan-300">
-											{#if isSender}
+											{#if isSender && isRecipient}
+												{tx.recipientUsername}
+											{:else if isSender}
 												To: {tx.recipientUsername ||
 													"Unknown"}
 											{:else if isRecipient}
@@ -477,13 +480,24 @@
 													"System"}
 											{/if}
 										</td>
-										<td
-											class="p-2 font-bold"
-											class:text-red-400={isSender}
-											class:text-green-400={isRecipient}
-											class:line-through={tx.status === "forked"}
-										>
-											{isSender ? "-" : "+"}{tx.amount} BTC
+										<td class="p-2 {tx.status === 'forked' ? 'line-through' : ''}">
+											{#if isSender && isRecipient}
+												<span class="text-xs text-red-400">
+													-{tx.amount} BTC
+												</span>
+												<span class="text-xs text-green-400">
+													+{tx.amount} BTC
+												</span>
+												
+											{:else if isSender}
+												<span class="text-red-400">
+													-{tx.amount} BTC
+												</span>
+											{:else if isRecipient}
+												<span class="text-green-400">
+													+{tx.amount} BTC
+												</span>
+											{/if}
 										</td>
 										<td class="p-2 text-cyan-600">
 											{timeAgo(tx.createdAt)}
