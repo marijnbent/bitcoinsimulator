@@ -5,7 +5,6 @@
     import { goto } from '$app/navigation';
 	
 	let { children } = $props();
-	const blockchainId = $page.params.id;
 	
 	// Check if we're on a blockchain or wallet page
 	$effect(() => {
@@ -17,6 +16,7 @@
 	
 	// Logout function
 	function logout() {
+		const blockchainId = $page.params.id;
 		removeUser(blockchainId);
 		goto(`/`);
 	}
@@ -43,7 +43,7 @@
 					<button 
 						aria-label="Logout"
 						onclick={logout}
-						class="text-cyan-400 hover:text-cyan-300 transition-colors"
+						class="text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
 					>
 						Logout
 					</button>
