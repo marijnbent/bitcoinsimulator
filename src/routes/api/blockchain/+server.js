@@ -119,7 +119,7 @@ async function createBlockchain(data) {
   };
 
   // Create 5 random transactions
-  const randomTransactions = Array.from({ length: 5 }, () => ({
+  const randomTransactions = Array.from({ length: 10 }, () => ({
     id: crypto.randomUUID(),
     blockchainId: newBlockchain.id,
     blockId: null,
