@@ -79,6 +79,22 @@ export async function POST({ params, request }) {
       return json({ error: 'Nonce is required' }, { status: 400 });
     }
 
+    if (typeof data.minerId !== 'string') {
+      return json({ error: 'Miner ID must be a string' }, { status: 400 });
+    }
+
+    if (typeof data.nonce !== 'number') {
+      return json({ error: 'Nonce must be a number' }, { status: 400 });
+    }
+
+    if (data.transactionIds && !Array.isArray(data.transactionIds)) {
+      return json({ error: 'Transaction IDs must be an array' }, { status: 400 });
+    }
+
+    if (data.transactionIds && !data.transactionIds.every(id => typeof id === 'string')) {
+      return json({ error: 'Transaction IDs must be an array of strings' }, { status: 400 });
+    }
+    
     // Get the blockchain from the database
     const blockchains = await db.select().from(blockchain).where(eq(blockchain.id, id));
 

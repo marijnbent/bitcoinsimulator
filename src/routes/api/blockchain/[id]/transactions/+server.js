@@ -77,6 +77,18 @@ export async function POST({ params, request }) {
       return json({ error: 'Amount must be greater than 0' }, { status: 400 });
     }
 
+    if (typeof data.senderId !== 'string') {
+      return json({ error: 'Sender ID must be a string' }, { status: 400 });
+    }
+
+    if (typeof data.recipientId !== 'string') {
+      return json({ error: 'Recipient ID must be a string' }, { status: 400 });
+    }
+
+    if (typeof data.amount !== 'number') {
+      return json({ error: 'Amount must be a number' }, { status: 400 });
+    }
+    
     // Get the blockchain from the database
     const blockchains = await db.select().from(blockchain).where(eq(blockchain.id, id));
 

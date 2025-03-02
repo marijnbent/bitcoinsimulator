@@ -39,12 +39,20 @@ export async function POST({ request }) {
     if (!data.name) {
       return json({ error: 'Name is required' }, { status: 400 });
     }
+
+    if (data.leadingZeros !== undefined && (typeof data.leadingZeros !== 'number' || data.leadingZeros < 0 || data.leadingZeros > 256)) {
+      return json({ error: 'Leading zeros must be a number between 0 and 256' }, { status: 400 });
+    }
+
+    if (data.blockReward !== undefined && (typeof data.blockReward !== 'number' || data.blockReward <= 0)) {
+      return json({ error: 'Block reward must be a number greater than 0' }, { status: 400 });
+    }
     
     // Create a new blockchain with Genesis block and Satoshi user
     const newBlockchain = await createBlockchain({
       name: data.name,
-      leadingZeros: data.leadingZeros || 10,
-      blockReward: data.blockReward || 3.125
+      leadingZeros: data.leadingZeros,
+      blockReward: data.blockReward
     });
     
     return json(newBlockchain, { status: 201 });

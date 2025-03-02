@@ -45,6 +45,14 @@ export async function POST({ params, request }) {
       return json({ error: 'Name is required' }, { status: 400 });
     }
 
+    if (typeof data.name !== 'string') {
+      return json({ error: 'Name must be a string' }, { status: 400 });
+    }
+
+    if (data.name.length < 3 || data.name.length > 32) {
+      return json({ error: 'Name must be between 3 and 32 characters' }, { status: 400 });
+    }
+    
     // Get the blockchain from the database
     const blockchains = await db.select().from(blockchain).where(eq(blockchain.id, id));
 
