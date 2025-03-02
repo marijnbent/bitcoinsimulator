@@ -8,10 +8,10 @@
 </svelte:head>
 
 <section class="container mx-auto mt-8 p-4">
-  <h1 class="text-2xl font-bold mb-4">Changelog</h1>
+  <h1 class="text-2xl font-bold mb-4 cyberpunk-glow">Changelog</h1>
 
   <div class="mb-6">
-    <h2 class="text-xl font-semibold mb-2">Version 1.0.1</h2>
+    <h2 class="text-xl font-semibold mb-2 cyberpunk-glow">Version 1.0.1</h2>
      <ul class="list-disc pl-5">
       <li><strong>Bug fix:</strong> Fixed logout bug.</li>
       <li><strong>Enhancement:</strong> Added scrollbar styling.</li>
@@ -20,7 +20,7 @@
   </div>
 
   <div class="mb-6">
-    <h2 class="text-xl font-semibold mb-2">Version 1.0</h2>
+    <h2 class="text-xl font-semibold mb-2 cyberpunk-glow">Version 1.0</h2>
     <ul class="list-disc pl-5">
       <li><strong>Blockchain Simulation:</strong> Core engine for simulating blockchain operations</li>
       <li><strong>Wallet Management:</strong> Create, manage, and interact with multiple wallets</li>
