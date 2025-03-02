@@ -15,6 +15,7 @@
       <span class="text-sm">Released on 2025-03-03</span>
      <ul class="list-disc pl-5 pt-2">
       <li><strong>Bug fix:</strong> Fixed logout bug.</li>
+      <li><strong>Bug fix:</strong> Display full error message.</li>
       <li><strong>Enhancement:</strong> Added scrollbar styling.</li>
       <li><strong>Enhancement:</strong> Transaction handling improvements, mostly related to transactions to the same user.</li>
     </ul>
