@@ -85,25 +85,3 @@
 	</footer>
 </div>
 
-<style>
-	:global(body) {
-		background-color: #111827; /* bg-gray-900 */
-		color: #22d3ee; /* text-cyan-400 */
-		font-family: 'Courier New', monospace;
-	}
-	
-	:global(.cyberpunk-glow) {
-		text-shadow: 0 0 5px #22d3ee, 0 0 6px #22d3ee;
-	}
-	
-	:global(.cyberpunk-box) {
-		border: 1px solid #0e7490; /* border-cyan-700 */
-		background-color: rgba(17, 24, 39, 0.8); /* bg-gray-900 with opacity */
-		box-shadow: 0 0 10px #0e7490, inset 0 0 5px #0e7490;
-	}
-	
-	:global(.cyberpunk-box-selected) {
-		border: 1px solid #7e22ce !important; /* border-purple-700 */
-		box-shadow: 0 0 10px #7e22ce, inset 0 0 5px #7e22ce !important;
-	}
-</style>
