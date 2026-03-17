@@ -21,6 +21,9 @@
 	let user = null;
 	let balance = 0;
 	let transactions = [];
+	let pendingTransactions = [];
+	let confirmedTransactions = [];
+	let forkedTransactions = [];
 	let isLoading = true;
 	let error = null;
 
@@ -37,6 +40,10 @@
 
 	// State for tracking the maximum block height
 	let maxBlockHeight = 0;
+
+	$: pendingTransactions = transactions.filter((tx) => tx.status === "pending");
+	$: confirmedTransactions = transactions.filter((tx) => tx.status === "confirmed");
+	$: forkedTransactions = transactions.filter((tx) => tx.status === "forked");
 
 	// Subscribe to updates
 	const unsubscribe = updateStore.subscribe((data) => {
@@ -297,304 +304,231 @@
 		if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
 		return `${Math.floor(seconds / 86400)} days ago`;
 	}
+
+	function goToChain() {
+		goto(`/blockchain/${blockchainId}`);
+	}
+
+	function getTransactionStageLabel(tx) {
+		if (tx.status === "confirmed") {
+			return `Added to the main chain (${tx.confirmations} confirmation${tx.confirmations === 1 ? "" : "s"})`;
+		}
+
+		if (tx.status === "pending") {
+			return "Waiting in the mempool to be mined";
+		}
+
+		return "Included in a side branch (fork)";
+	}
+
+	function getTransactionStageTone(tx) {
+		if (tx.status === "confirmed") return "text-green-400";
+		if (tx.status === "pending") return "text-amber-300";
+		return "text-red-400";
+	}
+
+	function getWalletNextAction() {
+		if (!transactions.length) {
+			return "Send a transaction to create something the class can watch move through the blockchain.";
+		}
+
+		if (transactions.some((tx) => tx.status === "pending")) {
+			return "Go back to the blockchain page and point out that your transaction is now waiting in the mempool.";
+		}
+
+		if (transactions.some((tx) => tx.status === "confirmed")) {
+			return "Open the blockchain page and show the block that confirmed your transaction.";
+		}
+
+		return "Use this page to compare what happened in your wallet with what the chain view shows.";
+	}
 </script>
 
 <div class="py-6">
 	{#if isLoading}
 		<div class="flex justify-center items-center h-64">
-			<div class="text-xl text-cyan-400">Loading wallet data...</div>
+			<div class="text-xl text-cyan-400">Loading wallet...</div>
 		</div>
 	{:else if error}
-		<div
-			class="bg-red-900 border border-red-700 text-red-300 p-4 rounded mb-6"
-		>
+		<div class="bg-red-900 border border-red-700 text-red-300 p-4 rounded mb-6">
 			{error}
-			<button
-				onclick={() => (error = null)}
-				class="ml-2 text-red-300 hover:text-red-200"
-			>
-				✕
-			</button>
+			<button onclick={() => (error = null)} class="ml-2 text-red-300 hover:text-red-200">✕</button>
 		</div>
 	{:else}
-		<!-- Wallet View -->
 		<div>
-			<div class="flex justify-between items-center mb-6">
-				<h1 class="text-3xl font-bold cyberpunk-glow">Wallet</h1>
-
-				<div class="text-cyan-500">
-					<span>Blockchain: {blockchain?.name || 'Unknown'}</span>
+			<!-- Header -->
+			<div class="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+				<h1 class="text-2xl font-bold cyberpunk-glow">Wallet</h1>
+				<span class="text-sm text-cyan-600">@{user.username}</span>
+				<span class="text-sm text-cyan-600">{blockchain?.name}</span>
+				<div class="ml-auto flex items-center gap-4">
+					<span class="text-2xl font-bold text-cyan-300 cyberpunk-glow">{balance.toFixed(4)} BTC</span>
 				</div>
 			</div>
 
-			<!-- User Info & Balance -->
-			<div class="mb-6 p-6 cyberpunk-box rounded-lg">
-				<div
-					class="flex flex-col md:flex-row justify-between items-center"
-				>
-					<div>
-						<h2 class="text-xl font-bold mb-2">Your Account</h2>
-						<p class="text-cyan-500">
-							Name: <span class="text-cyan-300">{user.name}</span>
-						</p>
-						<p class="text-cyan-500">
-							Username: <span class="text-cyan-300"
-								>{user.username}</span
-							>
-						</p>
-						<p class="text-cyan-500">
-							Chain ID: <span class="text-cyan-300"
-								>{user.blockchainId}</span
-							>
-						</p>
-					</div>
+			<div class="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
+				<!-- Send Transaction -->
+				<div class="cyberpunk-box rounded-lg p-4 border-l-2 border-l-green-700">
+					<h2 class="text-lg font-bold mb-3">Send</h2>
 
-					<div class="mt-4 md:mt-0 text-center">
-						<h2 class="text-xl font-bold mb-2">Balance</h2>
-						<p class="text-4xl font-bold text-cyan-300">
-							{balance.toFixed(4)} BTC
-						</p>
+					{#if users && users.length > 1}
+						<div class="flex flex-wrap gap-2 mb-3">
+							{#each users.filter((u) => u && u.id !== user.id) as otherUser}
+								<button
+									class="px-3 py-1 text-sm rounded-full transition-colors"
+									class:bg-cyan-700={recipient === otherUser.username}
+									class:text-white={recipient === otherUser.username}
+									class:bg-gray-800={recipient !== otherUser.username}
+									class:text-cyan-400={recipient !== otherUser.username}
+									class:border-cyan-600={recipient !== otherUser.username}
+									class:border={recipient !== otherUser.username}
+									class:hover:bg-cyan-800={recipient !== otherUser.username}
+									onclick={() => (recipient = otherUser.username)}
+								>
+									{otherUser.username}
+								</button>
+							{/each}
+						</div>
+					{/if}
+
+					<div class="space-y-3">
+						<div>
+							<label for="recipient-wallet" class="block text-xs text-cyan-600 mb-1">Recipient</label>
+							<input
+								id="recipient-wallet"
+								type="text"
+								bind:value={recipient}
+								placeholder="username"
+								class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+							/>
+						</div>
+						<div>
+							<label for="send-amount" class="block text-xs text-cyan-600 mb-1">Amount (BTC)</label>
+							<input
+								id="send-amount"
+								type="number"
+								bind:value={amount}
+								min="0.0001"
+								step="0.0001"
+								max={balance}
+								placeholder="0.0000"
+								class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+							/>
+						</div>
+						<button
+							onclick={sendTransaction}
+							disabled={isSending || !recipient || !amount || amount <= 0 || amount > balance}
+							class="w-full py-3 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+						>
+							{isSending ? "Sending..." : "Send"}
+						</button>
 					</div>
 				</div>
-			</div>
 
-			<!-- Send Transaction -->
-			<div class="mb-8 p-6 cyberpunk-box rounded-lg">
-				<h2 class="text-xl font-bold mb-4">Send Transaction</h2>
+				<!-- Transaction History -->
+				<div class="cyberpunk-box rounded-lg p-4 border-l-2 border-l-cyan-600">
+					<h2 class="text-lg font-bold mb-3">Transactions</h2>
 
-				<div class="flex flex-wrap gap-2 mb-6">
-					{#if users && users.length > 0}
-						{#each users.filter((u) => u && u.id !== user.id) as otherUser}
-							<button
-								class="px-3 py-1 text-sm rounded-full transition-colors"
-								class:bg-cyan-700={recipient === otherUser.username}
-								class:text-white={recipient === otherUser.username}
-								class:bg-gray-800={recipient !== otherUser.username}
-								class:text-cyan-400={recipient !==
-									otherUser.username}
-								class:border-cyan-600={recipient !==
-									otherUser.username}
-								class:border={recipient !== otherUser.username}
-								class:hover:bg-cyan-800={recipient !==
-									otherUser.username}
-								onclick={() => (recipient = otherUser.username)}
-							>
-								{otherUser.username}
-							</button>
-						{/each}
+					{#if !transactions || transactions.length === 0}
+						<p class="text-cyan-600 text-sm">No transactions yet.</p>
+					{:else}
+						<div class="overflow-x-auto">
+							<table class="w-full text-left text-sm">
+								<thead>
+									<tr class="border-b border-cyan-800">
+										<th class="p-2 text-cyan-600 font-normal">Type</th>
+										<th class="p-2 text-cyan-600 font-normal">From/To</th>
+										<th class="p-2 text-cyan-600 font-normal">Amount</th>
+										<th class="p-2 text-cyan-600 font-normal">Status</th>
+										<th class="p-2 text-cyan-600 font-normal">Block</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each transactions as tx (tx.id)}
+										{@const isSender = tx.senderId === user.id}
+										{@const isRecipient = tx.recipientId === user.id}
+										<tr class="border-b border-cyan-900 hover:bg-gray-800">
+											<td class="p-2">
+												{#if isSender && isRecipient}
+													<span class="text-cyan-400 text-xs">Self</span>
+												{:else if isSender}
+													<span class="text-red-400">↑ Sent</span>
+												{:else if isRecipient}
+													<span class="text-green-400">↓ Recv</span>
+												{/if}
+											</td>
+											<td class="p-2 text-cyan-300">
+												{#if isSender && isRecipient}
+													{tx.recipientUsername}
+												{:else if isSender}
+													{tx.recipientUsername || "?"}
+												{:else}
+													{tx.senderUsername || "System"}
+												{/if}
+											</td>
+											<td class="p-2 {tx.status === 'forked' ? 'opacity-40 line-through' : ''}">
+												{#if isSender && !isRecipient}
+													<span class="text-red-400">-{tx.amount}</span>
+												{:else if isRecipient && !isSender}
+													<span class="text-green-400">+{tx.amount}</span>
+												{:else}
+													<span class="text-cyan-400">{tx.amount}</span>
+												{/if}
+											</td>
+											<td class="p-2">
+												{#if tx.status === "confirmed"}
+													<span class="inline-flex items-center gap-1 rounded bg-green-950 border border-green-700 px-1.5 py-0.5 text-xs text-green-400">✓ {tx.confirmations}×</span>
+												{:else if tx.status === "pending"}
+													<span class="inline-flex items-center gap-1 rounded bg-amber-950 border border-amber-700 px-1.5 py-0.5 text-xs text-amber-300">⏳ pending</span>
+												{:else if tx.status === "forked"}
+													<span class="inline-flex items-center gap-1 rounded bg-red-950 border border-red-800 px-1.5 py-0.5 text-xs text-red-400">⚡ forked</span>
+												{/if}
+											</td>
+											<td class="p-2 text-cyan-600 font-mono text-xs">
+												{#if tx.block}{tx.block.hash.substring(0, 8)}…{/if}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
 					{/if}
 				</div>
-
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div>
-						<label class="block text-sm text-cyan-500 mb-1">
-							Recipient Username
-						</label>
-						<input
-							type="text"
-							bind:value={recipient}
-							placeholder="Enter recipient username"
-							class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-						/>
-					</div>
-
-					<div>
-						<label class="block text-sm text-cyan-500 mb-1">
-							Amount (BTC)
-						</label>
-						<input
-							type="number"
-							bind:value={amount}
-							min="0.0001"
-							step="0.0001"
-							max={balance}
-							placeholder="0.0000"
-							class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-						/>
-					</div>
-				</div>
-
-				<button
-					onclick={sendTransaction}
-					disabled={isSending ||
-						!recipient ||
-						!amount ||
-						amount <= 0 ||
-						amount > balance}
-					class="mt-4 py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
-				>
-					{isSending ? "Sending..." : "Send Transaction"}
-				</button>
 			</div>
 
-			<!-- Transaction History -->
-			<div class="p-6 cyberpunk-box rounded-lg">
-				<h2 class="text-xl font-bold mb-4">Transaction History</h2>
-
-				{#if !transactions || transactions.length === 0}
-					<p class="text-cyan-500">No transactions yet.</p>
-				{:else}
+			<!-- Mined Blocks -->
+			{#if minedBlocks && minedBlocks.length > 0}
+				<div class="mt-6 cyberpunk-box rounded-lg p-4">
+					<h2 class="text-lg font-bold mb-3">Blocks Mined</h2>
 					<div class="overflow-x-auto">
-						<table class="w-full text-left">
+						<table class="w-full text-left text-sm">
 							<thead>
 								<tr class="border-b border-cyan-800">
-									<th class="p-2 text-cyan-500">Type</th>
-									<th class="p-2 text-cyan-500">From/To</th>
-									<th class="p-2 text-cyan-500">Amount</th>
-									<th class="p-2 text-cyan-500">Time</th>
-									<th class="p-2 text-cyan-500">Status</th>
-									<th class="p-2 text-cyan-500">Block Hash</th
-									>
-								</tr>
-							</thead>
-							<tbody>
-								{#each transactions as tx (tx.id)}
-									{@const isSender = tx.senderId === user.id}
-									{@const isRecipient =
-										tx.recipientId === user.id}
-									<tr
-										class="border-b border-cyan-900 hover:bg-gray-800"
-									>
-										<td class="p-2 {tx.status === 'forked' ? 'line-through' : ''}">
-											{#if isSender && isRecipient}
-												<span class="text-red-400 text-xs">Sent</span>
-												<span class="text-green-400 text-xs">Received</span>	
-											{:else if isSender}
-												<span class="text-red-400">Sent</span>
-											{:else if isRecipient}
-												<span class="text-green-400"
-													>Received</span
-												>
-											{:else}
-												<span class="text-cyan-400"
-													>Unknown</span
-												>
-											{/if}
-										</td>
-										<td class="p-2 text-cyan-300">
-											{#if isSender && isRecipient}
-												{tx.recipientUsername}
-											{:else if isSender}
-												To: {tx.recipientUsername ||
-													"Unknown"}
-											{:else if isRecipient}
-												From: {tx.senderUsername ||
-													"System"}
-											{/if}
-										</td>
-										<td class="p-2 {tx.status === 'forked' ? 'line-through' : ''}">
-											{#if isSender && isRecipient}
-												<span class="text-xs text-red-400">
-													-{tx.amount} BTC
-												</span>
-												<span class="text-xs text-green-400">
-													+{tx.amount} BTC
-												</span>
-												
-											{:else if isSender}
-												<span class="text-red-400">
-													-{tx.amount} BTC
-												</span>
-											{:else if isRecipient}
-												<span class="text-green-400">
-													+{tx.amount} BTC
-												</span>
-											{/if}
-										</td>
-										<td class="p-2 text-cyan-600">
-											{timeAgo(tx.createdAt)}
-										</td>
-										<td class="p-2">
-											{#if tx.status === "confirmed"}
-												<span class="text-green-400">
-													Confirmed ({tx.confirmations}
-													{tx.confirmations === 1
-														? "confirmation"
-														: "confirmations"})
-												</span>
-											{:else if tx.status === "pending"}
-												<span class="text-yellow-400"
-													>Pending (in mempool)</span
-												>
-											{:else if tx.status === "forked"}
-												<span class="text-red-400"
-													>In Fork</span
-												>
-											{/if}
-										</td>
-										<td class="p-2 text-cyan-500">
-											{#if tx.block}
-												{tx.block.hash.substring(
-													0,
-													10,
-												)}...
-											{/if}
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				{/if}
-			</div>
-
-			<!-- Block History -->
-			<div class="mt-6 p-6 cyberpunk-box rounded-lg">
-				<h2 class="text-xl font-bold mb-4">Block History</h2>
-
-				{#if !minedBlocks || minedBlocks.length === 0}
-					<p class="text-cyan-500">
-						You haven't mined any blocks yet.
-					</p>
-				{:else}
-					<div class="overflow-x-auto">
-						<table class="w-full text-left">
-							<thead>
-								<tr class="border-b border-cyan-800">
-									<th class="p-2 text-cyan-500">Height</th>
-									<th class="p-2 text-cyan-500">Time</th>
-									<th class="p-2 text-cyan-500">Hash</th>
-									<th class="p-2 text-cyan-500">Status</th>
-									<th class="p-2 text-cyan-500">Reward</th>
+									<th class="p-2 text-cyan-600 font-normal">Height</th>
+									<th class="p-2 text-cyan-600 font-normal">Time</th>
+									<th class="p-2 text-cyan-600 font-normal">Hash</th>
+									<th class="p-2 text-cyan-600 font-normal">Status</th>
+									<th class="p-2 text-cyan-600 font-normal">Reward</th>
 								</tr>
 							</thead>
 							<tbody>
 								{#each minedBlocks as block (block.id)}
-									<tr
-										class="border-b border-cyan-900 hover:bg-gray-800"
-									>
-										<td class="p-2 text-cyan-300"
-											>{block.height}</td
-										>
-										<td class="p-2 text-cyan-300"
-											>{timeAgo(block.minedAt)}</td
-										>
-										<td class="p-2 text-cyan-300"
-											>{block.hash.substring(
-												0,
-												10,
-											)}...</td
-										>
+									<tr class="border-b border-cyan-900 hover:bg-gray-800">
+										<td class="p-2 text-cyan-300">{block.height}</td>
+										<td class="p-2 text-cyan-600">{timeAgo(block.minedAt)}</td>
+										<td class="p-2 text-cyan-600 font-mono">{block.hash.substring(0, 10)}…</td>
 										<td class="p-2">
 											{#if block.inLongestChain}
-												<span class="text-green-400"
-													>In Longest Chain</span
-												>
+												<span class="text-green-400">main chain</span>
 											{:else}
-												<span class="text-red-400"
-													>Forked</span
-												>
+												<span class="text-red-400">side branch</span>
 											{/if}
 										</td>
 										<td class="p-2">
 											{#if block.inLongestChain}
-												<span class="text-green-400"
-													>{block.reward}</span
-												>
+												<span class="text-green-400">{block.reward} BTC</span>
 											{:else}
-												<span class="text-red-400"
-													>-</span
-												>
+												<span class="text-red-400">—</span>
 											{/if}
 										</td>
 									</tr>
@@ -602,8 +536,8 @@
 							</tbody>
 						</table>
 					</div>
-				{/if}
-			</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

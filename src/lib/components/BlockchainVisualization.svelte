@@ -318,6 +318,25 @@
 		renderTree();
 	}
 
+	function shortHash(hash, length = 10) {
+		if (!hash) return 'Unknown';
+		return `${hash.substring(0, length)}...`;
+	}
+
+	function getLongestChainCount() {
+		if (!blocks || blocks.length === 0) return 0;
+		return blocks.filter((block) => blockTree?.blocksByHash?.[block.hash]?.isInLongestChain).length;
+	}
+
+	function getForkCount() {
+		if (!blocks || blocks.length === 0) return 0;
+		return blocks.filter((block) => blockTree?.blocksByHash?.[block.hash] && !blockTree.blocksByHash[block.hash].isInLongestChain).length;
+	}
+
+	function getExpandedBlock() {
+		return blocks.find((block) => block.id === expandedBlockId) || null;
+	}
+
 	// Render using the grid-based blockTree format
 	function renderGridTree() {
 		if (!blockTree) return;
@@ -492,16 +511,19 @@
 				blockGroup.append("foreignObject")
 					.attr("width", blockWidth)
 					.attr("height", blockHeight)
-					.html(`
-						<div class="cyberpunk-box bg-gray-900 rounded-lg p-3 hover:border-cyan-600 transition-colors ${borderClass} ${selectedClass}" style="width: 100%; height: 100%; overflow: hidden;">
-							<div class="mb-1 flex justify-between items-center">
-								<span class="font-bold text-cyan-400">Block ${block.height}</span>
-								<span class="text-xs text-cyan-600">${timeAgo(block.minedAt)}</span>
-							</div>
-							<div class="mb-1">
-								<span class="text-cyan-500">Hash:</span>
-								<span class="text-xs text-cyan-300 break-all">${block.hash.substring(0, 10)}...</span>
-							</div>
+						.html(`
+							<div class="cyberpunk-box bg-gray-900 rounded-lg p-3 hover:border-cyan-600 transition-colors ${borderClass} ${selectedClass}" style="width: 100%; height: 100%; overflow: hidden;">
+								<div class="mb-1 flex justify-between items-center">
+									<span class="font-bold text-cyan-400">Block ${block.height}</span>
+									<span class="text-xs text-cyan-600">${timeAgo(block.minedAt)}</span>
+								</div>
+								<div class="mb-1 text-xs ${block.isInLongestChain ? 'text-green-400' : 'text-yellow-400'}">
+									${block.isInLongestChain ? 'Main chain' : 'Side branch'}
+								</div>
+								<div class="mb-1">
+									<span class="text-cyan-500">Hash:</span>
+									<span class="text-xs text-cyan-300 break-all">${block.hash.substring(0, 10)}...</span>
+								</div>
 							<div class="mb-1">
 								<span class="text-cyan-500">Previous:</span>
 								<span class="text-xs text-cyan-300 break-all">${block.previousHash.substring(0, 10)}...</span>
@@ -515,22 +537,22 @@
 									<span class="text-cyan-500">Tx:</span>
 									<span class="text-cyan-300">${block.transactions ? block.transactions.length : 0}</span>
 								</div>
-								<div class="flex space-x-2">
-									<button
-										class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer view-tx-btn"
-										data-block-id="${block.id}"
-										title="View Transactions"
-									>
+									<div class="flex space-x-2">
+										<button
+											class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer view-tx-btn"
+											data-block-id="${block.id}"
+											title="Inspect this block"
+										>
 										<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
 											<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
 											<path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
 										</svg>
 									</button>
-									<button
-										class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer select-block-btn"
-										data-block-hash="${block.hash}"
-										title="Select as Previous Block"
-									>
+										<button
+											class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer select-block-btn"
+											data-block-hash="${block.hash}"
+											title="Mine on top of this block"
+										>
 										<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
 											<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
 										</svg>
@@ -553,10 +575,11 @@
 		d3.selectAll(".select-block-btn").on("click", function() {
 			const blockHash = d3.select(this).attr("data-block-hash");
 			const block = blocks.find(b => b.hash === blockHash);
-			if (block) {
-				selectedPreviousBlock = block;
+			if (!block) {
+				return;
 			}
 
+			selectedPreviousBlock = block;
 			selectPreviousBlock(block);
 		});
 	}
@@ -577,8 +600,6 @@
 </script>
 
 <div class="mb-8">
-	<h2 class="text-2xl font-bold mb-4">Blockchain</h2>
-
 	{#if blocks.length === 0}
 		<div class="p-6 cyberpunk-box rounded-lg text-center">
 			<p class="text-cyan-500">
@@ -587,6 +608,12 @@
 			</p>
 		</div>
 	{:else}
+		<div class="mb-3 flex items-center gap-4 text-xs text-cyan-600">
+			<span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-green-500"></span>Main chain ({getLongestChainCount()})</span>
+			<span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-500"></span>Side branch ({getForkCount()})</span>
+			{#if selectedPreviousBlock}<span class="ml-auto text-cyan-500">Mining on block {selectedPreviousBlock.height}</span>{/if}
+		</div>
+
 		<div class="relative">
 			{#if blockTree && blockTree.maxRow > 1}
 				<button
@@ -603,17 +630,31 @@
 
 		<!-- Expanded Block Transactions -->
 		{#if expandedBlockId}
-			{@const expandedBlock = blocks.find(
-				(b) => b.id === expandedBlockId,
-			)}
+			{@const expandedBlock = getExpandedBlock()}
 			{#if expandedBlock}
 				<div class="mt-4 p-4 cyberpunk-box rounded-lg">
-					<h3 class="text-xl font-bold mb-4">
-						Transactions in Block {expandedBlock.height}
-					</h3>
+					<div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+						<div>
+							<h3 class="text-xl font-bold">
+								Block {expandedBlock.height}
+							</h3>
+							<p class="mt-2 text-sm text-cyan-500">
+								Mined by {expandedBlock.minerUsername || "Unknown"} {timeAgo(expandedBlock.minedAt)}.
+								This block points to {shortHash(expandedBlock.previousHash)} and contains
+								{expandedBlock.transactions?.length || 0} transaction{expandedBlock.transactions?.length === 1 ? "" : "s"}.
+							</p>
+						</div>
+						<div class="rounded border px-3 py-2 text-sm {blockTree?.blocksByHash?.[expandedBlock.hash]?.isInLongestChain ? 'border-green-700 bg-green-950/30 text-green-300' : 'border-yellow-700 bg-yellow-950/30 text-yellow-200'}">
+							{blockTree?.blocksByHash?.[expandedBlock.hash]?.isInLongestChain ? 'Main chain block' : 'Side branch block'}
+						</div>
+					</div>
 
+
+					<h4 class="mt-4 text-lg font-bold text-cyan-200">
+						Transactions in this block
+					</h4>
 					{#if expandedBlock.transactions && expandedBlock.transactions.length > 0}
-						<div class="overflow-x-auto">
+						<div class="mt-3 overflow-x-auto">
 							<table class="w-full text-left">
 								<thead>
 									<tr

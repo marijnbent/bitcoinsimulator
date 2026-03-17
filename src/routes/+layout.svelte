@@ -63,17 +63,17 @@
 		<div class="bg-gray-800 border-b border-cyan-700">
 			<div class="container mx-auto flex justify-center">
 				<nav class="flex">
-					<a 
-						href={`/blockchain/${$page.params.id}`} 
+					<a
+						href={`/blockchain/${$page.params.id}`}
 						class="py-3 px-6 text-center border-b-2 {$page.url.pathname.startsWith('/blockchain/') ? 'border-cyan-500 text-cyan-300' : 'border-transparent text-cyan-600 hover:text-cyan-400'} transition-colors"
 					>
-						Blockchain View
+						Blockchain
 					</a>
-					<a 
-						href={`/wallet/${$page.params.id}`} 
+					<a
+						href={`/wallet/${$page.params.id}`}
 						class="py-3 px-6 text-center border-b-2 {$page.url.pathname.startsWith('/wallet/') ? 'border-cyan-500 text-cyan-300' : 'border-transparent text-cyan-600 hover:text-cyan-400'} transition-colors"
 					>
-						Wallet View
+						Wallet
 					</a>
 				</nav>
 			</div>
