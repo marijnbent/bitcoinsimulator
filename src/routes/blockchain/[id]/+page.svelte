@@ -39,14 +39,13 @@ import { calculateBalance } from "$lib/utils/mining.js";
 	let selectedPreviousBlock = $state(null);
 	let generatedHashes = $state([]);
 	const maxHashesToShow = 4;
-	let workshopMode = $state(true);
 	let recentEvent = $state(null);
 	let latestBlock = $state(null);
 	let longestChainBlockIds = $state([]);
 	let userPendingTransactions = $state([]);
 	let userConfirmedTransactions = $state([]);
 	let userMinedBlocks = $state([]);
-	let workshopEventTimeout = null;
+	let recentEventTimeout = null;
 
 	// Balance
 	let balance = $state(0);
@@ -82,14 +81,34 @@ import { calculateBalance } from "$lib/utils/mining.js";
 
 	// Set the latest block as the default previous block when blocks are loaded
 	$effect(() => {
-		if (blocks.length > 0 && !selectedPreviousBlock) {
-			// Find the latest block
+		if (blocks.length === 0) {
+			selectedPreviousBlock = null;
+			return;
+		}
+
+		if (!selectedPreviousBlock?.hash) {
 			selectedPreviousBlock = blocks.reduce(
 				(latest, block) =>
 					block.height > latest.height ? block : latest,
 				blocks[0],
 			);
+			return;
 		}
+
+		const refreshedSelectedBlock = blocks.find(
+			(block) => block.hash === selectedPreviousBlock.hash,
+		);
+
+		if (refreshedSelectedBlock) {
+			selectedPreviousBlock = refreshedSelectedBlock;
+			return;
+		}
+
+		selectedPreviousBlock = blocks.reduce(
+			(latest, block) =>
+				block.height > latest.height ? block : latest,
+			blocks[0],
+		);
 	});
 
 	$effect(() => {
@@ -185,17 +204,17 @@ import { calculateBalance } from "$lib/utils/mining.js";
 						block.height > latest.height ? block : latest,
 					data.blocks[0],
 				);
-				announceWorkshopEvent(
-					`New block added at height ${incomingBlock.height}. The chain view just updated for everyone.`,
-					"green",
-				);
+			announceChainEvent(
+				`New block added at height ${incomingBlock.height}. The chain view just updated for everyone.`,
+				"green",
+			);
 			}
 		}
 		if (data.mempool) {
 			const previousMempoolCount = mempool.length;
 			mempool = data.mempool;
 			if (previousMempoolCount >= 0 && data.mempool.length > previousMempoolCount) {
-				announceWorkshopEvent(
+				announceChainEvent(
 					"A new transaction is waiting in the mempool. This is the next thing a miner can include.",
 					"amber",
 				);
@@ -266,9 +285,7 @@ import { calculateBalance } from "$lib/utils/mining.js";
 	onDestroy(() => {
 		unsubscribe();
 		updateStore.stop();
-		if (workshopEventTimeout) {
-			clearTimeout(workshopEventTimeout);
-		}
+		if (recentEventTimeout) clearTimeout(recentEventTimeout);
 	});
 
 	// Register a new user
@@ -306,7 +323,7 @@ import { calculateBalance } from "$lib/utils/mining.js";
 
 			// Save user to localStorage
 			saveUser(user);
-			announceWorkshopEvent(
+			announceChainEvent(
 				"You're connected. Next, open your wallet and send a transaction so the room can watch it move through the chain.",
 				"cyan",
 			);
@@ -414,7 +431,7 @@ import { calculateBalance } from "$lib/utils/mining.js";
 			mempool = mempool.filter(
 				(tx) => !newBlock.transactionIds.includes(tx.id),
 			);
-			announceWorkshopEvent(
+			announceChainEvent(
 				`Block ${minedBlock.height} was broadcast. Watch the chain and wallet views update together.`,
 				"green",
 			);
@@ -517,13 +534,6 @@ import { calculateBalance } from "$lib/utils/mining.js";
 		}
 
 		selectedPreviousBlock = block;
-		const isOnMainChain = longestChainBlockIds.includes(block.id);
-		announceWorkshopEvent(
-			isOnMainChain
-				? `Building on block ${block.height} · main chain`
-				: `Building on block ${block.height} · side branch`,
-			isOnMainChain ? "cyan" : "amber",
-		);
 	}
 
 	// Toggle block expansion
@@ -558,12 +568,12 @@ import { calculateBalance } from "$lib/utils/mining.js";
 		}
 	});
 
-	function announceWorkshopEvent(message, tone = "cyan") {
+	function announceChainEvent(message, tone = "cyan") {
 		recentEvent = { message, tone };
-		if (workshopEventTimeout) {
-			clearTimeout(workshopEventTimeout);
+		if (recentEventTimeout) {
+			clearTimeout(recentEventTimeout);
 		}
-		workshopEventTimeout = setTimeout(() => {
+		recentEventTimeout = setTimeout(() => {
 			recentEvent = null;
 		}, 6000);
 	}
@@ -579,251 +589,218 @@ import { calculateBalance } from "$lib/utils/mining.js";
 		return isCurrentHashValid() ? "text-green-400" : "text-amber-400";
 	}
 
-	function getHashExplanation() {
-		if (!currentHash) {
-			return "Pick transactions and calculate a hash to start the mining demo.";
-		}
-
-		const matchedZeros = getLeadingZeroCount(currentHash);
-		if (isCurrentHashValid()) {
-			return `This hash starts with ${matchedZeros} zero${matchedZeros === 1 ? "" : "s"}, so it satisfies the current difficulty and can be broadcast.`;
-		}
-
-		return `This hash only starts with ${matchedZeros} zero${matchedZeros === 1 ? "" : "s"}. Keep changing the nonce until it reaches ${blockchain.leadingZeros}.`;
-	}
-
-	function getNextAction() {
-		if (!user) {
-			return "Create an account so you can join the workshop chain.";
-		}
-
-		if (
-			userPendingTransactions.length === 0 &&
-			userConfirmedTransactions.length === 0
-		) {
-			return "Open your wallet and send a transaction. That gives the room something to watch move through the system.";
-		}
-
-		if (mempool.length > 0 && !currentHash) {
-			return "Select the waiting transactions you want to include, then calculate a hash.";
-		}
-
-		if (currentHash && !isCurrentHashValid()) {
-			return "Keep changing the nonce or use auto-mine until the hash has enough leading zeros.";
-		}
-
-		if (isCurrentHashValid()) {
-			return "Broadcast the valid block so everyone can see the mempool empty and the chain grow.";
-		}
-
-		return "Watch the chain state update, then repeat with another transaction or another miner.";
-	}
-
-	function getWorkshopSteps() {
-		return [
-			{
-				label: "Join the chain",
-				description: "Create your account on the shared workshop chain.",
-				done: Boolean(user),
-			},
-			{
-				label: "Create a transaction",
-				description: "Use the wallet to send or receive something.",
-				done:
-					userPendingTransactions.length > 0 ||
-					userConfirmedTransactions.length > 0,
-			},
-			{
-				label: "See it waiting",
-				description: "Watch the transaction sit in the mempool.",
-				done: userPendingTransactions.length > 0,
-			},
-			{
-				label: "Mine a block",
-				description: "Find a valid hash and add a block.",
-				done: userMinedBlocks.length > 0,
-			},
-			{
-				label: "See a confirmation",
-				description: "Watch your transaction land on the main chain.",
-				done: userConfirmedTransactions.length > 0,
-			},
-		];
-	}
-
 	function goToWallet() {
 		goto(`/wallet/${blockchainId}`);
 	}
 </script>
 
-<div class="py-6">
+<div class="blockchain-page">
 	{#if error}
-		<div
-			class="bg-red-900 border border-red-700 text-red-300 p-4 rounded mb-6 flex justify-between items-center"
-		>
-			<div>{error}</div>
-			<button
-				aria-label="Dismiss"
-				onclick={() => (error = null)}
-				class="text-red-300 hover:text-red-200"
-				title="Dismiss"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-5 w-5"
-					viewBox="0 0 20 20"
-					fill="currentColor"
-				>
-					<path
-						fill-rule="evenodd"
-						d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-						clip-rule="evenodd"
-					/>
-				</svg>
-			</button>
+		<div class="status-banner status-banner--danger page-banner">
+			<span>{error}</span>
+			<button type="button" class="ui-button-ghost" onclick={() => (error = null)}>Dismiss</button>
 		</div>
 	{/if}
+
 	{#if isLoading}
-		<div class="flex justify-center items-center h-64">
-			<div class="text-xl text-cyan-400">Loading blockchain data...</div>
+		<div class="surface surface-pad page-loader">
+			<p class="eyebrow">Loading</p>
+			<h2 class="section-title">Syncing chain state</h2>
 		</div>
 	{:else if !user}
-		<div class="max-w-md mx-auto p-6 cyberpunk-box rounded-lg">
-			<h2 class="text-2xl font-bold mb-6 text-center">Join This Workshop Chain</h2>
-
-			<div class="mb-4">
-				<label for="workshop-user-name" class="block text-sm text-cyan-500 mb-1">
-					Your Name
-				</label>
-				<input
-					id="workshop-user-name"
-					type="text"
-					bind:value={userName}
-					placeholder="Enter your name"
-					class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-				/>
-				<p class="mt-1 text-xs text-cyan-600">
-					This will be converted to a username: {userName
-						? nameToUsername(userName)
-						: "example_username"}
-				</p>
-			</div>
-
-			<button
-				aria-label="Login"
-				onclick={registerUser}
-				disabled={!userName || isRegistering}
-				class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
-			>
-				{isRegistering ? "Joining..." : "Join Chain"}
-			</button>
-		</div>
-	{:else}
-		<div>
-			<!-- Header bar -->
-			<div class="mb-5 flex flex-wrap items-center gap-x-6 gap-y-2">
-				<h1 class="text-2xl font-bold cyberpunk-glow">{blockchain.name}</h1>
-				<span class="text-sm text-cyan-600">@{user.username}</span>
-				<div class="flex flex-wrap items-center gap-2 text-xs">
-					<span class="bg-gray-800 border border-cyan-900 rounded px-2 py-0.5 text-cyan-500">{users.length} participants</span>
-					<span class="bg-gray-800 border border-cyan-900 rounded px-2 py-0.5 text-cyan-500">{mempool.length} mempool</span>
-					<span class="bg-gray-800 border border-cyan-900 rounded px-2 py-0.5 text-cyan-500">height: {latestBlock ? latestBlock.height : 0}</span>
-					{#if editingDifficulty}
-						<span class="flex items-center gap-1 bg-gray-800 border border-cyan-600 rounded px-1 py-0.5">
-							<span class="text-cyan-600 px-1">diff:</span>
-							<button onclick={() => { if (newDifficulty > 1) newDifficulty -= 1; }} class="w-6 h-6 flex items-center justify-center rounded bg-gray-700 hover:bg-gray-600 text-cyan-300 font-bold text-sm">−</button>
-							<span class="text-cyan-300 w-6 text-center font-bold">{newDifficulty}</span>
-							<button onclick={() => { if (newDifficulty < 16) newDifficulty += 1; }} class="w-6 h-6 flex items-center justify-center rounded bg-gray-700 hover:bg-gray-600 text-cyan-300 font-bold text-sm">+</button>
-							<button onclick={saveDifficulty} disabled={isSavingDifficulty} class="ml-2 px-3 py-1 rounded bg-green-700 hover:bg-green-600 text-white text-xs font-bold">Save</button>
-							<button onclick={() => (editingDifficulty = false)} class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-cyan-300 text-xs font-bold">Cancel</button>
-						</span>
-					{:else}
+		<section class="join-shell surface">
+			<div class="surface-pad join-grid">
+				<div>
+					<p class="eyebrow">Join</p>
+					<h1 class="section-title join-title">{blockchain?.name || 'Blockchain'}</h1>
+					<div class="join-stats">
+						<div class="metric">
+							<span class="metric-label">Difficulty</span>
+							<span class="metric-value">{blockchain?.leadingZeros ?? 0} zeros</span>
+						</div>
+						<div class="metric">
+							<span class="metric-label">Block reward</span>
+							<span class="metric-value">{blockchain?.blockReward ?? 0} BTC</span>
+						</div>
+					</div>
+				</div>
+				<div class="surface-muted join-form">
+					<div class="surface-pad">
+						<label class="ui-label" for="chain-user-name">Your name</label>
+						<input
+							id="chain-user-name"
+							type="text"
+							bind:value={userName}
+							placeholder="Satoshi Student"
+							class="ui-input"
+						/>
+						<p class="join-preview mono">@{userName ? nameToUsername(userName) : 'username'}</p>
 						<button
-							onclick={() => { newDifficulty = blockchain.leadingZeros; editingDifficulty = true; }}
-							class="bg-gray-800 border border-cyan-900 rounded px-2 py-0.5 text-cyan-500 hover:border-cyan-600 hover:text-cyan-300 transition-colors cursor-pointer"
-							title="Click to change difficulty"
-						>diff: {blockchain.leadingZeros} ✎</button>
-					{/if}
-					<span class="bg-gray-800 border border-cyan-900 rounded px-2 py-0.5 text-cyan-300 font-bold">{balance.toFixed(4)} BTC</span>
+							type="button"
+							class="ui-button join-button"
+							onclick={registerUser}
+							disabled={!userName || isRegistering}
+						>
+							{isRegistering ? 'Joining...' : 'Join chain'}
+						</button>
+					</div>
 				</div>
 			</div>
+		</section>
+	{:else}
+		<div class="workspace-stack">
+			<section class="surface">
+				<div class="surface-pad chain-header">
+					<div class="chain-id">
+						<span class="eyebrow">Live</span>
+						<h1 class="chain-name">{blockchain.name}</h1>
+					</div>
+
+					<div class="chain-stats">
+						<div class="cstat">
+							<span class="cstat-l">Participants</span>
+							<span class="cstat-v">{users.length}</span>
+						</div>
+						<div class="cstat">
+							<span class="cstat-l">Mempool</span>
+							<span class="cstat-v">{mempool.length}</span>
+						</div>
+						<div class="cstat">
+							<span class="cstat-l">Height</span>
+							<span class="cstat-v">{latestBlock ? latestBlock.height : 0}</span>
+						</div>
+						<div class="cstat">
+							<span class="cstat-l">Balance</span>
+							<span class="cstat-v mono">{balance.toFixed(4)}</span>
+						</div>
+						<div class="cstat">
+							<span class="cstat-l">Difficulty</span>
+							{#if editingDifficulty}
+								<div class="diff-edit">
+									<button type="button" class="ui-button-ghost mini-button" onclick={() => { if (newDifficulty > 1) newDifficulty -= 1; }}>−</button>
+									<span class="mono diff-val">{newDifficulty}</span>
+									<button type="button" class="ui-button-ghost mini-button" onclick={() => { if (newDifficulty < 16) newDifficulty += 1; }}>+</button>
+									<button type="button" class="ui-button-secondary" onclick={saveDifficulty} disabled={isSavingDifficulty}>{isSavingDifficulty ? '...' : 'Save'}</button>
+									<button type="button" class="ui-button-ghost" onclick={() => (editingDifficulty = false)}>Cancel</button>
+								</div>
+							{:else}
+								<button type="button" class="cstat-v cstat-edit" onclick={() => { newDifficulty = blockchain.leadingZeros; editingDifficulty = true; }}>
+									{blockchain.leadingZeros}
+								</button>
+							{/if}
+						</div>
+					</div>
+
+					<div class="chain-actions">
+						<button type="button" class="ui-button" onclick={goToWallet}>Open wallet</button>
+						<a href="/odds" class="ui-button-ghost">Odds</a>
+					</div>
+				</div>
+			</section>
 
 			{#if recentEvent}
-				<div class="mb-4 rounded border px-3 py-2 text-sm {recentEvent.tone === 'green' ? 'border-green-700 bg-green-950/40 text-green-300' : recentEvent.tone === 'amber' ? 'border-amber-700 bg-amber-950/40 text-amber-200' : 'border-cyan-700 bg-gray-900 text-cyan-200'}">
-					{recentEvent.message}
+				<div
+					class="status-banner page-banner"
+					class:status-banner--success={recentEvent.tone === 'green'}
+					class:status-banner--warn={recentEvent.tone === 'amber'}
+					class:status-banner--info={recentEvent.tone === 'cyan'}
+				>
+					<span>{recentEvent.message}</span>
 				</div>
 			{/if}
 
-			<BlockchainVisualization
-				{blocks}
-				{expandedBlockId}
-				{selectedPreviousBlock}
-				{blockchainId}
-				{toggleBlock}
-				{timeAgo}
-				{selectPreviousBlock}
-			/>
-
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-				<!-- Mempool -->
-				<div class="p-4 cyberpunk-box rounded-lg border-l-2 border-l-cyan-600">
-					<h2 class="text-lg font-bold mb-3">Mempool <span class="text-sm font-normal text-cyan-600">({mempool.length})</span></h2>
-
-					{#if mempool.length === 0}
-						<p class="text-cyan-600 text-sm">No transactions waiting.</p>
-					{:else}
-						<div class="space-y-2 max-h-[420px] overflow-y-auto pr-2">
-							{#each mempool as tx (tx.id)}
-								<button
-									type="button"
-									class="w-full p-3 border border-cyan-800 rounded hover:bg-gray-800 cursor-pointer text-left transition-colors"
-									class:bg-cyan-900={selectedTransactions.some((t) => t.id === tx.id)}
-									class:ring-1={selectedTransactions.some((t) => t.id === tx.id)}
-									class:ring-cyan-500={selectedTransactions.some((t) => t.id === tx.id)}
-									aria-label="Toggle transaction"
-									onclick={() => toggleTransaction(tx)}
-								>
-									<div class="flex items-center justify-between gap-4">
-										<span class="text-sm text-cyan-300">{tx.senderUsername || "Unknown"} → {tx.recipientUsername || "Unknown"}</span>
-										<div class="text-right shrink-0">
-											<span class="text-cyan-300 font-bold">{tx.amount} BTC</span>
-											{#if selectedTransactions.some((t) => t.id === tx.id)}
-												<span class="ml-2 text-xs text-cyan-500">✓</span>
-											{/if}
-										</div>
-									</div>
-								</button>
-							{/each}
+			<section class="surface chain-view-shell">
+				<div class="surface-pad chain-view-pad">
+					<div class="section-head">
+						<div>
+							<p class="eyebrow">Chain View</p>
+							<h2 class="section-title">Main chain and side branches</h2>
 						</div>
-					{/if}
-				</div>
-
-				<!-- Mining -->
-				<div class="p-4 cyberpunk-box rounded-lg border-l-2 border-l-cyan-600">
-					<div class="flex items-center justify-between mb-3">
-						<h2 class="text-lg font-bold">Mine</h2>
-						<span class="text-xs text-cyan-600">{selectedTransactions.length} tx selected</span>
+						<p class="body-copy section-note">Select a block to mine on top of it.</p>
 					</div>
 
-					<!-- Parent block -->
-					<div class="mb-3">
-						{#if selectedPreviousBlock}
-							<div class="p-2 bg-gray-800 border rounded text-xs flex items-center justify-between {longestChainBlockIds.includes(selectedPreviousBlock.id) ? 'border-purple-700' : 'border-amber-700'}">
-								<span class="text-cyan-400">Building on block {selectedPreviousBlock.height}</span>
-								<span class="{longestChainBlockIds.includes(selectedPreviousBlock.id) ? 'text-green-400' : 'text-amber-400'}">
-									{longestChainBlockIds.includes(selectedPreviousBlock.id) ? 'main chain' : 'side branch'}
-								</span>
+					<BlockchainVisualization
+						{blocks}
+						{expandedBlockId}
+						{selectedPreviousBlock}
+						{blockchainId}
+						{toggleBlock}
+						{timeAgo}
+						{selectPreviousBlock}
+					/>
+				</div>
+			</section>
+
+			<div class="workspace-columns">
+				<section class="surface">
+					<div class="surface-pad">
+						<div class="section-head">
+							<div>
+								<p class="eyebrow">Mempool</p>
+								<h2 class="section-title">Waiting transactions</h2>
 							</div>
+							<span class="chip mono">{mempool.length} queued</span>
+						</div>
+
+						{#if mempool.length === 0}
+							<p class="body-copy empty-copy">No transactions waiting.</p>
 						{:else}
-							<div class="p-2 bg-gray-800 border border-red-800 rounded text-xs text-red-400">
-								Select a block in the chain above to mine on top of it.
+							<div class="queue-list">
+								{#each mempool as tx (tx.id)}
+									<button
+										type="button"
+										class="queue-item"
+										class:is-selected={selectedTransactions.some((t) => t.id === tx.id)}
+										onclick={() => toggleTransaction(tx)}
+									>
+										<div>
+											<p class="queue-path">{tx.senderUsername || 'Unknown'} → {tx.recipientUsername || 'Unknown'}</p>
+											<p class="queue-meta mono">#{tx.id.slice(0, 8)}</p>
+										</div>
+										<div class="queue-amount">
+											<strong>{tx.amount} BTC</strong>
+											{#if selectedTransactions.some((t) => t.id === tx.id)}
+												<span class="status-pill status-pill--info">Selected</span>
+											{/if}
+										</div>
+									</button>
+								{/each}
 							</div>
 						{/if}
 					</div>
+				</section>
 
-					<!-- Nonce -->
-					<div class="mb-3">
-						<label for="mining-nonce" class="block text-xs text-cyan-600 mb-1">Nonce</label>
+				<section class="surface">
+					<div class="surface-pad">
+						<div class="section-head">
+							<div>
+								<p class="eyebrow">Mine</p>
+								<h2 class="section-title">Build a block</h2>
+							</div>
+							<span class="chip mono">{selectedTransactions.length} tx selected</span>
+						</div>
+
+						<div class="surface-muted mining-parent">
+							<div class="surface-pad">
+								<p class="ui-label">Parent block</p>
+								{#if selectedPreviousBlock}
+									<div class="parent-row">
+										<strong>Block {selectedPreviousBlock.height}</strong>
+										<span
+											class:status-pill--success={longestChainBlockIds.includes(selectedPreviousBlock.id)}
+											class:status-pill--warn={!longestChainBlockIds.includes(selectedPreviousBlock.id)}
+											class="status-pill"
+										>
+											{longestChainBlockIds.includes(selectedPreviousBlock.id) ? 'Main chain' : 'Side branch'}
+										</span>
+									</div>
+								{:else}
+									<p class="body-copy">Select a block above first.</p>
+								{/if}
+							</div>
+						</div>
+
+						<label class="ui-label" for="mining-nonce">Nonce</label>
 						<input
 							id="mining-nonce"
 							type="number"
@@ -831,76 +808,409 @@ import { calculateBalance } from "$lib/utils/mining.js";
 							min="0"
 							oninput={updateHash}
 							disabled={isMining || autoMining}
-							class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+							class="ui-input mono"
 						/>
-					</div>
 
-					<!-- Hash display -->
-					<div class="mb-3">
-						<div class="p-2 bg-gray-800 border rounded font-mono text-xs break-all"
-							class:border-cyan-800={!currentHash}
-							class:border-red-700={currentHash && !isCurrentHashValid()}
-							class:border-green-700={currentHash && isCurrentHashValid()}
-						>
-							{currentHash || '—'}
+						<div class="hash-shell">
+							<p class="ui-label">Current hash</p>
+							<div class="hash-output mono" class:is-valid={currentHash && isCurrentHashValid()}>
+								{currentHash || '—'}
+							</div>
+							<div class="hash-progress">
+								<div
+									class="hash-progress__fill"
+									class:is-valid={currentHash && isCurrentHashValid()}
+									style={`width: ${Math.min((getLeadingZeroCount(currentHash) / blockchain.leadingZeros) * 100, 100)}%`}
+								></div>
+							</div>
+							<div class="hash-meta">
+								<span class="mono">Need {blockchain.leadingZeros} zeros</span>
+								<span class={getHashTone()}>{getLeadingZeroCount(currentHash)} matched</span>
+							</div>
 						</div>
-						<div class="mt-1.5 h-1.5 w-full overflow-hidden rounded bg-gray-800">
-							<div
-								class="{isCurrentHashValid() ? 'bg-green-500' : 'bg-amber-500'} h-full transition-all"
-								style={`width: ${Math.min((getLeadingZeroCount(currentHash) / blockchain.leadingZeros) * 100, 100)}%`}
-							></div>
-						</div>
-						<div class="mt-1 flex justify-between text-xs">
-							<span class="text-cyan-600">need {blockchain.leadingZeros} zeros</span>
-							<span class={getHashTone()}>{getLeadingZeroCount(currentHash)} matched</span>
-						</div>
-					</div>
 
-					<!-- Hash attempts -->
-					{#if generatedHashes.length > 0}
-						<div class="mb-3 max-h-[120px] overflow-y-auto space-y-1">
-							{#each generatedHashes as hashData}
-								<div class="p-1.5 bg-gray-800 border rounded font-mono text-xs flex gap-2"
-									class:border-green-700={isValidHash(hashData.hash, blockchain.leadingZeros)}
-									class:border-gray-700={!isValidHash(hashData.hash, blockchain.leadingZeros)}
-								>
-									<span class="text-cyan-600 shrink-0">{hashData.nonce}</span>
-									<span class="text-cyan-300 truncate">{hashData.hash}</span>
-									{#if isValidHash(hashData.hash, blockchain.leadingZeros)}
-										<span class="text-green-500 shrink-0">✓</span>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					{/if}
+						{#if generatedHashes.length > 0}
+							<div class="attempt-list">
+								{#each generatedHashes as hashData}
+									<div class="attempt-item" class:is-valid={isValidHash(hashData.hash, blockchain.leadingZeros)}>
+										<span class="mono">{hashData.nonce}</span>
+										<span class="mono attempt-hash">{hashData.hash}</span>
+									</div>
+								{/each}
+							</div>
+						{/if}
 
-					<!-- Buttons -->
-					<div class="flex gap-2 mb-2">
+						<div class="mining-actions">
+							<button type="button" class="ui-button-secondary" onclick={updateHash} disabled={isMining || autoMining}>
+								Calculate
+							</button>
+							<button type="button" class="ui-button-ghost" onclick={autoMining ? () => (autoMining = false) : autoMineBlock} disabled={isMining}>
+								{autoMining ? 'Stop' : 'Auto-mine'}
+							</button>
+						</div>
+
 						<button
-							onclick={updateHash}
-							disabled={isMining || autoMining}
-							class="flex-1 py-2 px-3 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-bold rounded focus:outline-none transition-colors"
+							type="button"
+							class="ui-button mine-submit"
+							onclick={mineBlock}
+							disabled={isMining || autoMining || !isCurrentHashValid()}
 						>
-							Calculate
-						</button>
-						<button
-							onclick={autoMining ? () => (autoMining = false) : autoMineBlock}
-							disabled={isMining}
-							class="flex-1 py-2 px-3 bg-purple-700 hover:bg-purple-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-bold rounded focus:outline-none transition-colors"
-						>
-							{autoMining ? "Stop" : "Auto-Mine"}
+							{isMining ? 'Broadcasting...' : 'Broadcast block'}
 						</button>
 					</div>
-
-					<button
-						onclick={mineBlock}
-						disabled={isMining || autoMining || !isCurrentHashValid()}
-						class="w-full py-3 px-4 bg-green-700 hover:bg-green-600 disabled:bg-gray-700 disabled:text-gray-500 text-white text-base font-bold tracking-wide rounded focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
-					>
-						{isMining ? "Broadcasting..." : "Broadcast Block"}
-					</button>
-				</div>
+				</section>
 			</div>
 		</div>
 	{/if}
 </div>
+
+<style>
+	.blockchain-page,
+	.workspace-stack {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.blockchain-page {
+		width: 100%;
+		max-width: 100%;
+		min-width: 0;
+		overflow-x: hidden;
+	}
+
+	.workspace-stack,
+	.workspace-stack > *,
+	.workspace-columns > * {
+		min-width: 0;
+	}
+
+	.page-banner {
+		margin-bottom: 0.1rem;
+	}
+
+	.page-loader {
+		max-width: 520px;
+		margin: 2rem auto 0;
+	}
+
+	/* Join */
+	.join-shell {
+		max-width: 820px;
+		margin: 1rem auto 0;
+	}
+
+	.join-grid {
+		display: grid;
+		grid-template-columns: 1fr minmax(280px, 0.85fr);
+		gap: 1.5rem;
+		align-items: start;
+	}
+
+	.join-stats {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.75rem;
+		margin-top: 1rem;
+	}
+
+	.join-title {
+		font-size: clamp(1.4rem, 2vw, 2rem);
+		margin-top: 0.25rem;
+	}
+
+	.join-preview {
+		margin: 0.7rem 0 0;
+		color: var(--text-faint);
+		font-size: 0.86rem;
+	}
+
+	.join-button {
+		width: 100%;
+		margin-top: 1rem;
+	}
+
+	/* Chain header */
+	.chain-header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem 2rem;
+	}
+
+	.chain-id {
+		flex-shrink: 0;
+	}
+
+	.chain-name {
+		margin: 0.15rem 0 0;
+		font-size: clamp(1.2rem, 2vw, 1.75rem);
+		letter-spacing: -0.03em;
+	}
+
+	.chain-stats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1.5rem;
+		flex: 1;
+	}
+
+	.cstat {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.cstat-l {
+		color: var(--text-faint);
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+	}
+
+	.cstat-v {
+		color: var(--text);
+		font-size: 1rem;
+		font-weight: 700;
+	}
+
+	.cstat-edit {
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		color: var(--text);
+		font-size: 1rem;
+		font-weight: 700;
+		text-decoration: underline dotted rgba(103, 232, 249, 0.4);
+		text-underline-offset: 3px;
+	}
+
+	.diff-edit {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-top: 0.1rem;
+	}
+
+	.diff-val {
+		color: var(--text);
+		font-weight: 700;
+		min-width: 1.5rem;
+		text-align: center;
+	}
+
+	.chain-actions {
+		display: flex;
+		gap: 0.7rem;
+		flex-shrink: 0;
+	}
+
+	/* Workspace */
+	.workspace-columns {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+		gap: 1rem;
+		min-width: 0;
+	}
+
+	.chain-view-shell {
+		width: 100%;
+		max-width: 100%;
+		overflow: hidden;
+	}
+
+	.chain-view-pad {
+		min-width: 0;
+	}
+
+	.section-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.section-note {
+		font-size: 0.88rem;
+	}
+
+	/* Queue */
+	.queue-list {
+		display: grid;
+		gap: 0.5rem;
+		margin-top: 0.75rem;
+	}
+
+	.queue-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.7rem 0.9rem;
+		border: 1px solid rgba(103, 232, 249, 0.1);
+		border-radius: 0.75rem;
+		background: rgba(8, 18, 28, 0.6);
+		color: var(--text-muted);
+		text-align: left;
+		cursor: pointer;
+		transition: border-color 160ms ease, background 160ms ease;
+	}
+
+	.queue-item.is-selected {
+		border-color: rgba(103, 232, 249, 0.35);
+		background: rgba(12, 28, 42, 0.82);
+	}
+
+	.queue-path,
+	.queue-meta,
+	.parent-row strong {
+		margin: 0;
+	}
+
+	.queue-path {
+		color: var(--text);
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+
+	.queue-meta {
+		margin-top: 0.2rem;
+		color: var(--text-faint);
+		font-size: 0.76rem;
+	}
+
+	.queue-amount {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.3rem;
+		font-size: 0.9rem;
+		color: var(--text);
+	}
+
+	.empty-copy {
+		margin-top: 0.75rem;
+	}
+
+	/* Mining */
+	.mining-parent {
+		margin-top: 0.25rem;
+		margin-bottom: 1rem;
+	}
+
+	.parent-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		margin-top: 0.4rem;
+	}
+
+	.hash-shell {
+		margin-top: 1rem;
+	}
+
+	.hash-output {
+		margin-top: 0.4rem;
+		padding: 0.7rem 0.9rem;
+		border: 1px solid rgba(103, 232, 249, 0.14);
+		border-radius: 0.75rem;
+		background: rgba(7, 17, 27, 0.88);
+		font-size: 0.8rem;
+		word-break: break-all;
+		color: var(--text-muted);
+		line-height: 1.5;
+		transition: border-color 200ms ease, color 200ms ease;
+	}
+
+	.hash-output.is-valid {
+		border-color: rgba(134, 239, 172, 0.4);
+		color: #d9ffe4;
+	}
+
+	.hash-progress {
+		height: 0.35rem;
+		margin-top: 0.5rem;
+		background: rgba(103, 232, 249, 0.08);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+
+	.hash-progress__fill {
+		height: 100%;
+		background: linear-gradient(90deg, #facc15, #fb923c);
+		transition: width 100ms ease;
+	}
+
+	.hash-progress__fill.is-valid {
+		background: linear-gradient(90deg, #86efac, #4ade80);
+	}
+
+	.hash-meta {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-top: 0.4rem;
+		font-size: 0.78rem;
+		color: var(--text-faint);
+	}
+
+	.attempt-list {
+		display: grid;
+		gap: 0.25rem;
+		margin-top: 0.75rem;
+	}
+
+	.attempt-item {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 0.7rem;
+		padding: 0.4rem 0.7rem;
+		border: 1px solid rgba(103, 232, 249, 0.08);
+		border-radius: 0.5rem;
+		background: rgba(8, 18, 28, 0.55);
+		font-size: 0.76rem;
+		color: var(--text-faint);
+	}
+
+	.attempt-item.is-valid {
+		border-color: rgba(134, 239, 172, 0.26);
+		color: #a8ffbc;
+	}
+
+	.attempt-hash {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.mining-actions {
+		display: flex;
+		gap: 0.7rem;
+		margin-top: 1rem;
+	}
+
+	.mine-submit {
+		width: 100%;
+		margin-top: 0.75rem;
+	}
+
+	.mini-button {
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+	}
+
+	@media (max-width: 860px) {
+		.join-grid,
+		.workspace-columns {
+			grid-template-columns: 1fr;
+		}
+
+		.chain-header {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+	}
+</style>

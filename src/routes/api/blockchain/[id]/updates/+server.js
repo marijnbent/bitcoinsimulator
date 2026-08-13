@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { blockchain, block, transaction, user } from '$lib/server/db/schema';
 import { eq, and, gt, isNull, desc } from 'drizzle-orm';
+import { withComputedBlockHeights } from '$lib/utils/blockchain.js';
 
 // GET /api/blockchain/[id]/updates - Get updates for a blockchain
 export async function GET({ params, url }) {
@@ -20,12 +21,7 @@ export async function GET({ params, url }) {
     // Get new blocks since last update
     const blocks = await db.select()
       .from(block)
-      .where(
-        and(
-          eq(block.blockchainId, id),
-          gt(block.minedAt, lastUpdate)
-        )
-      );
+      .where(eq(block.blockchainId, id));
     
     // Get new transactions since last update
     const transactions = await db.select()
@@ -92,14 +88,14 @@ export async function GET({ params, url }) {
     }
     
     // Add transactions to blocks and miner username
-    const blocksWithTransactions = blocks.map(b => ({
+    const blocksWithTransactions = withComputedBlockHeights(blocks.map(b => ({
       ...b,
       minerUsername: b.minerId ? userMap[b.minerId] : null,
       transactions: blockTransactions[b.id] || []
-    }));
+    })));
     
     // Calculate the highest block height for confirmation counts
-    const maxHeight = blocks.reduce((max, b) => {
+    const maxHeight = blocksWithTransactions.reduce((max, b) => {
       return (b.height !== undefined && b.height !== null && b.height > max) ? b.height : max;
     }, 0);
     

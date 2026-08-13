@@ -497,8 +497,8 @@
 				if (!block) continue;
 				
 				const isSelected = selectedPreviousBlock && selectedPreviousBlock.hash === block.hash;
-				const borderClass = block.isInLongestChain ? "border-green-500" : "border-yellow-500";
-				const selectedClass = isSelected ? "cyberpunk-box-selected" : "";
+				const chainClass = block.isInLongestChain ? "chain-node--main" : "chain-node--fork";
+				const selectedClass = isSelected ? "chain-node--selected" : "";
 				
 				// Calculate reversed x position (newest blocks on left)
 				const reversedCol = maxColumn - col;
@@ -512,34 +512,30 @@
 					.attr("width", blockWidth)
 					.attr("height", blockHeight)
 						.html(`
-							<div class="cyberpunk-box bg-gray-900 rounded-lg p-3 hover:border-cyan-600 transition-colors ${borderClass} ${selectedClass}" style="width: 100%; height: 100%; overflow: hidden;">
-								<div class="mb-1 flex justify-between items-center">
-									<span class="font-bold text-cyan-400">Block ${block.height}</span>
-									<span class="text-xs text-cyan-600">${timeAgo(block.minedAt)}</span>
+							<div class="chain-node ${chainClass} ${selectedClass}">
+								<div class="chain-node__top">
+									<span class="chain-node__label">Block ${block.height}</span>
+									<span class="chain-node__meta">${timeAgo(block.minedAt)}</span>
 								</div>
-								<div class="mb-1 text-xs ${block.isInLongestChain ? 'text-green-400' : 'text-yellow-400'}">
+								<div class="chain-node__badge ${block.isInLongestChain ? 'chain-node__badge--main' : 'chain-node__badge--fork'}">
 									${block.isInLongestChain ? 'Main chain' : 'Side branch'}
 								</div>
-								<div class="mb-1">
-									<span class="text-cyan-500">Hash:</span>
-									<span class="text-xs text-cyan-300 break-all">${block.hash.substring(0, 10)}...</span>
+								<div class="chain-node__line">
+									<strong>Hash</strong> ${block.hash.substring(0, 10)}...
 								</div>
-							<div class="mb-1">
-								<span class="text-cyan-500">Previous:</span>
-								<span class="text-xs text-cyan-300 break-all">${block.previousHash.substring(0, 10)}...</span>
-							</div>
-							<div class="mb-1">
-								<span class="text-cyan-500">Miner:</span>
-								<span class="text-cyan-300">${block.minerUsername || "Unknown"}</span>
-							</div>
-							<div class="flex justify-between items-center">
+								<div class="chain-node__line">
+									<strong>Previous</strong> ${block.previousHash.substring(0, 10)}...
+								</div>
+								<div class="chain-node__line">
+									<strong>Miner</strong> ${block.minerUsername || "Unknown"}
+								</div>
+								<div class="chain-node__bottom">
 								<div>
-									<span class="text-cyan-500">Tx:</span>
-									<span class="text-cyan-300">${block.transactions ? block.transactions.length : 0}</span>
+									<span class="chain-node__meta">Tx ${block.transactions ? block.transactions.length : 0}</span>
 								</div>
-									<div class="flex space-x-2">
+									<div class="chain-node__actions">
 										<button
-											class="text-cyan-400 hover:text-cyan-300 focus:outline-none cursor-pointer view-tx-btn"
+											class="chain-node__icon view-tx-btn"
 											data-block-id="${block.id}"
 											title="Inspect this block"
 										>
@@ -549,7 +545,7 @@
 										</svg>
 									</button>
 										<button
-											class="text-purple-400 hover:text-purple-300 focus:outline-none cursor-pointer select-block-btn"
+											class="chain-node__icon select-block-btn"
 											data-block-hash="${block.hash}"
 											title="Mine on top of this block"
 										>
@@ -599,32 +595,33 @@
 	});
 </script>
 
-<div class="mb-8">
+<div class="viz-shell">
 	{#if blocks.length === 0}
-		<div class="p-6 cyberpunk-box rounded-lg text-center">
-			<p class="text-cyan-500">
+		<div class="surface-muted surface-pad text-center">
+			<p class="body-copy">
 				No blocks in the blockchain yet. Mine the first
 				block!
 			</p>
 		</div>
 	{:else}
-		<div class="mb-3 flex items-center gap-4 text-xs text-cyan-600">
-			<span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-green-500"></span>Main chain ({getLongestChainCount()})</span>
-			<span class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-500"></span>Side branch ({getForkCount()})</span>
-			{#if selectedPreviousBlock}<span class="ml-auto text-cyan-500">Mining on block {selectedPreviousBlock.height}</span>{/if}
+		<div class="viz-head">
+			<div class="chip-row">
+				<span class="chip"><span class="viz-dot viz-dot--main"></span>Main chain ({getLongestChainCount()})</span>
+				<span class="chip"><span class="viz-dot viz-dot--fork"></span>Side branch ({getForkCount()})</span>
+			</div>
 		</div>
 
 		<div class="relative">
 			{#if blockTree && blockTree.maxRow > 1}
 				<button
 					on:click={toggleShowAllRows}
-					class="absolute -top-10 right-2 z-10 px-3 py-2 rounded-md bg-slate-800 border border-cyan-500 text-cyan-400 hover:bg-slate-700 transition-colors text-xs"
+					class="ui-button-ghost viz-toggle"
 				>
 					{showAllRows ? 'Hide Forks' : 'Show All Forks'}
 				</button>
 			{/if}
-			<div class="overflow-x-auto pb-4">
-				<div bind:this={container} bind:clientWidth={containerWidth} class="d3-container" style="overflow-x: auto;"></div>
+			<div class="viz-scroll">
+				<div bind:this={container} bind:clientWidth={containerWidth} class="d3-container"></div>
 			</div>
 		</div>
 
@@ -632,74 +629,50 @@
 		{#if expandedBlockId}
 			{@const expandedBlock = getExpandedBlock()}
 			{#if expandedBlock}
-				<div class="mt-4 p-4 cyberpunk-box rounded-lg">
-					<div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+				<div class="surface-muted surface-pad expanded-shell">
+					<div class="expanded-head">
 						<div>
-							<h3 class="text-xl font-bold">
-								Block {expandedBlock.height}
-							</h3>
-							<p class="mt-2 text-sm text-cyan-500">
+							<h3 class="section-title">Block {expandedBlock.height}</h3>
+							<p class="body-copy expanded-copy">
 								Mined by {expandedBlock.minerUsername || "Unknown"} {timeAgo(expandedBlock.minedAt)}.
 								This block points to {shortHash(expandedBlock.previousHash)} and contains
 								{expandedBlock.transactions?.length || 0} transaction{expandedBlock.transactions?.length === 1 ? "" : "s"}.
 							</p>
 						</div>
-						<div class="rounded border px-3 py-2 text-sm {blockTree?.blocksByHash?.[expandedBlock.hash]?.isInLongestChain ? 'border-green-700 bg-green-950/30 text-green-300' : 'border-yellow-700 bg-yellow-950/30 text-yellow-200'}">
-							{blockTree?.blocksByHash?.[expandedBlock.hash]?.isInLongestChain ? 'Main chain block' : 'Side branch block'}
-						</div>
+							<span
+								class:status-pill--success={blockTree?.blocksByHash?.[expandedBlock.hash]?.isInLongestChain}
+								class:status-pill--warn={!blockTree?.blocksByHash?.[expandedBlock.hash]?.isInLongestChain}
+								class="status-pill"
+							>
+								{blockTree?.blocksByHash?.[expandedBlock.hash]?.isInLongestChain ? 'Main chain block' : 'Side branch block'}
+							</span>
 					</div>
 
 
-					<h4 class="mt-4 text-lg font-bold text-cyan-200">
-						Transactions in this block
-					</h4>
+					<h4 class="section-title expanded-title">Transactions in this block</h4>
 					{#if expandedBlock.transactions && expandedBlock.transactions.length > 0}
-						<div class="mt-3 overflow-x-auto">
-							<table class="w-full text-left">
+						<div class="table-shell">
+							<table class="ui-table">
 								<thead>
-									<tr
-										class="border-b border-cyan-800"
-									>
-										<th
-											class="p-2 text-cyan-500"
-											>From</th
-										>
-										<th
-											class="p-2 text-cyan-500"
-											>To</th
-										>
-										<th
-											class="p-2 text-cyan-500"
-											>Amount</th
-										>
+									<tr>
+										<th>From</th>
+										<th>To</th>
+										<th>Amount</th>
 									</tr>
 								</thead>
 								<tbody>
 									{#each expandedBlock.transactions as tx (tx.id)}
-										<tr
-											class="border-b border-cyan-900"
-										>
-											<td
-												class="p-2 text-cyan-300"
-												>{tx.senderUsername ||
-													"System"}</td
-											>
-											<td
-												class="p-2 text-cyan-300"
-												>{tx.recipientUsername ||
-													"Unknown"}</td
-											>
-											<td
-												class="p-2 text-cyan-300"
-												>{tx.amount} BTC</td
-											>
+										<tr>
+											<td>{tx.senderUsername || "System"}</td>
+											<td>{tx.recipientUsername || "Unknown"}</td>
+											<td>{tx.amount} BTC</td>
 										</tr>
 									{/each}
 								</tbody>
 							</table>
 						</div>
 					{:else}
-						<p class="text-cyan-500">
+						<p class="body-copy">
 							No transactions in this block.
 						</p>
 					{/if}
@@ -710,9 +683,78 @@
 </div>
 
 <style>
+	.viz-shell {
+		min-width: 0;
+		max-width: 100%;
+		margin-bottom: 2rem;
+	}
+
 	.d3-container {
-		border-radius: 0.5rem;
-		padding: 1rem;
+		width: max-content;
+		min-width: 100%;
+		padding: 1rem 0.25rem 1rem 0;
+	}
+
+	.viz-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.8rem;
+		margin-bottom: 1rem;
+	}
+
+	.viz-dot {
+		display: inline-block;
+		width: 0.55rem;
+		height: 0.55rem;
+		border-radius: 999px;
+	}
+
+	.viz-dot--main {
+		background: #86efac;
+	}
+
+	.viz-dot--fork {
+		background: #facc15;
+	}
+
+	.viz-toggle {
+		position: absolute;
+		top: -3.3rem;
+		right: 0;
+		z-index: 1;
+	}
+
+	.viz-scroll {
 		width: 100%;
+		max-width: 100%;
+		overflow-x: auto;
+		overflow-y: hidden;
+		padding-bottom: 0.5rem;
+		-webkit-overflow-scrolling: touch;
+		overscroll-behavior-x: contain;
+		scrollbar-gutter: stable both-edges;
+	}
+
+	.expanded-shell {
+		margin-top: 1rem;
+	}
+
+	.expanded-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: start;
+		justify-content: space-between;
+		gap: 0.8rem 1rem;
+	}
+
+	.expanded-copy {
+		margin-top: 0.7rem;
+		max-width: 48rem;
+	}
+
+	.expanded-title {
+		margin-top: 1.2rem;
 	}
 </style>

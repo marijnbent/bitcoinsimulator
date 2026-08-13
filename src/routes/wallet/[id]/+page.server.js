@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { blockchain, block, transaction, user } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { withComputedBlockHeights } from '$lib/utils/blockchain.js';
 
 export async function load({ params }) {
 	try {
@@ -47,7 +48,7 @@ export async function load({ params }) {
 		}
 		
 		// Add transactions and usernames to blocks
-		const blocksWithTransactions = blocks.map(b => ({
+		const blocksWithTransactions = withComputedBlockHeights(blocks.map(b => ({
 			...b,
 			minerUsername: b.minerId ? userMap[b.minerId] : null,
 			transactions: (blockTransactions[b.id] || []).map(tx => ({
@@ -55,7 +56,7 @@ export async function load({ params }) {
 				senderUsername: tx.senderId ? userMap[tx.senderId] : null,
 				recipientUsername: tx.recipientId ? userMap[tx.recipientId] : null
 			}))
-		}));
+		})));
 		
 		return {
 			blockchain: blockchains[0],

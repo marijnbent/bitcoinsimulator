@@ -90,13 +90,13 @@
 			// Use data from server-side load function
 			blockchain = data.blockchain;
 			users = data.users;
-			
+
 			// Initialize blocks from server data
 			blocks = data.blocks;
-			
+
 			// Calculate longest chain blocks
 			longestChainBlocks = getLongestChainBlocks(blocks);
-			
+
 			// Update mined blocks
 			minedBlocks = blocks
 				.filter((block) => block.minerId === user.id)
@@ -308,236 +308,367 @@
 	function goToChain() {
 		goto(`/blockchain/${blockchainId}`);
 	}
-
-	function getTransactionStageLabel(tx) {
-		if (tx.status === "confirmed") {
-			return `Added to the main chain (${tx.confirmations} confirmation${tx.confirmations === 1 ? "" : "s"})`;
-		}
-
-		if (tx.status === "pending") {
-			return "Waiting in the mempool to be mined";
-		}
-
-		return "Included in a side branch (fork)";
-	}
-
-	function getTransactionStageTone(tx) {
-		if (tx.status === "confirmed") return "text-green-400";
-		if (tx.status === "pending") return "text-amber-300";
-		return "text-red-400";
-	}
-
-	function getWalletNextAction() {
-		if (!transactions.length) {
-			return "Send a transaction to create something the class can watch move through the blockchain.";
-		}
-
-		if (transactions.some((tx) => tx.status === "pending")) {
-			return "Go back to the blockchain page and point out that your transaction is now waiting in the mempool.";
-		}
-
-		if (transactions.some((tx) => tx.status === "confirmed")) {
-			return "Open the blockchain page and show the block that confirmed your transaction.";
-		}
-
-		return "Use this page to compare what happened in your wallet with what the chain view shows.";
-	}
 </script>
 
-<div class="py-6">
+<div class="wallet-page">
 	{#if isLoading}
-		<div class="flex justify-center items-center h-64">
-			<div class="text-xl text-cyan-400">Loading wallet...</div>
+		<div class="surface surface-pad page-loader">
+			<p class="eyebrow">Loading</p>
+			<h2 class="section-title">Syncing wallet</h2>
 		</div>
 	{:else if error}
-		<div class="bg-red-900 border border-red-700 text-red-300 p-4 rounded mb-6">
-			{error}
-			<button onclick={() => (error = null)} class="ml-2 text-red-300 hover:text-red-200">✕</button>
+		<div class="status-banner status-banner--danger">
+			<span>{error}</span>
+			<button type="button" class="ui-button-ghost" onclick={() => (error = null)}>Dismiss</button>
 		</div>
 	{:else}
-		<div>
-			<!-- Header -->
-			<div class="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-				<h1 class="text-2xl font-bold cyberpunk-glow">Wallet</h1>
-				<span class="text-sm text-cyan-600">@{user.username}</span>
-				<span class="text-sm text-cyan-600">{blockchain?.name}</span>
-				<div class="ml-auto flex items-center gap-4">
-					<span class="text-2xl font-bold text-cyan-300 cyberpunk-glow">{balance.toFixed(4)} BTC</span>
-				</div>
-			</div>
-
-			<div class="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
-				<!-- Send Transaction -->
-				<div class="cyberpunk-box rounded-lg p-4 border-l-2 border-l-green-700">
-					<h2 class="text-lg font-bold mb-3">Send</h2>
-
-					{#if users && users.length > 1}
-						<div class="flex flex-wrap gap-2 mb-3">
-							{#each users.filter((u) => u && u.id !== user.id) as otherUser}
-								<button
-									class="px-3 py-1 text-sm rounded-full transition-colors"
-									class:bg-cyan-700={recipient === otherUser.username}
-									class:text-white={recipient === otherUser.username}
-									class:bg-gray-800={recipient !== otherUser.username}
-									class:text-cyan-400={recipient !== otherUser.username}
-									class:border-cyan-600={recipient !== otherUser.username}
-									class:border={recipient !== otherUser.username}
-									class:hover:bg-cyan-800={recipient !== otherUser.username}
-									onclick={() => (recipient = otherUser.username)}
-								>
-									{otherUser.username}
-								</button>
-							{/each}
-						</div>
-					{/if}
-
-					<div class="space-y-3">
-						<div>
-							<label for="recipient-wallet" class="block text-xs text-cyan-600 mb-1">Recipient</label>
-							<input
-								id="recipient-wallet"
-								type="text"
-								bind:value={recipient}
-								placeholder="username"
-								class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-							/>
-						</div>
-						<div>
-							<label for="send-amount" class="block text-xs text-cyan-600 mb-1">Amount (BTC)</label>
-							<input
-								id="send-amount"
-								type="number"
-								bind:value={amount}
-								min="0.0001"
-								step="0.0001"
-								max={balance}
-								placeholder="0.0000"
-								class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-							/>
-						</div>
-						<button
-							onclick={sendTransaction}
-							disabled={isSending || !recipient || !amount || amount <= 0 || amount > balance}
-							class="w-full py-3 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
-						>
-							{isSending ? "Sending..." : "Send"}
-						</button>
+		<div class="wallet-stack">
+			<section class="surface">
+				<div class="surface-pad wallet-header">
+					<div class="wallet-id">
+						<span class="eyebrow">Wallet</span>
+						<h1 class="wallet-name">@{user.username}</h1>
+					</div>
+					<div class="wallet-balance-block">
+						<span class="ui-label">Balance</span>
+						<div class="wallet-balance__value">{balance.toFixed(4)} BTC</div>
+					</div>
+					<div class="wallet-actions-group">
+						<button type="button" class="ui-button-secondary" onclick={goToChain}>Chain</button>
+						<a href="/odds" class="ui-button-ghost">Odds</a>
 					</div>
 				</div>
+			</section>
 
-				<!-- Transaction History -->
-				<div class="cyberpunk-box rounded-lg p-4 border-l-2 border-l-cyan-600">
-					<h2 class="text-lg font-bold mb-3">Transactions</h2>
+			<section class="metric-grid">
+				<div class="metric">
+					<span class="metric-label">Pending</span>
+					<span class="metric-value">{pendingTransactions.length}</span>
+				</div>
+				<div class="metric">
+					<span class="metric-label">Confirmed</span>
+					<span class="metric-value">{confirmedTransactions.length}</span>
+				</div>
+				<div class="metric">
+					<span class="metric-label">Forked</span>
+					<span class="metric-value">{forkedTransactions.length}</span>
+				</div>
+				<div class="metric">
+					<span class="metric-label">Blocks mined</span>
+					<span class="metric-value">{minedBlocks.length}</span>
+				</div>
+			</section>
 
-					{#if !transactions || transactions.length === 0}
-						<p class="text-cyan-600 text-sm">No transactions yet.</p>
-					{:else}
-						<div class="overflow-x-auto">
-							<table class="w-full text-left text-sm">
+			<div class="wallet-grid">
+				<section class="surface">
+					<div class="surface-pad">
+						<div class="section-head">
+							<div>
+								<p class="eyebrow">Send</p>
+								<h2 class="section-title">New transaction</h2>
+							</div>
+						</div>
+
+						{#if users && users.length > 1}
+							<div class="recipient-row">
+								{#each users.filter((u) => u && u.id !== user.id) as otherUser}
+									<button
+										type="button"
+										class="recipient-pill"
+										class:is-selected={recipient === otherUser.username}
+										onclick={() => (recipient = otherUser.username)}
+									>
+										{otherUser.username}
+									</button>
+								{/each}
+							</div>
+						{/if}
+
+						<div class="panel-grid">
+							<div>
+								<label class="ui-label" for="recipient-wallet">Recipient</label>
+								<input
+									id="recipient-wallet"
+									type="text"
+									bind:value={recipient}
+									placeholder="username"
+									class="ui-input"
+								/>
+							</div>
+							<div>
+								<label class="ui-label" for="send-amount">Amount (BTC)</label>
+								<input
+									id="send-amount"
+									type="number"
+									bind:value={amount}
+									min="0.0001"
+									step="0.0001"
+									max={balance}
+									placeholder="0.0000"
+									class="ui-input mono"
+								/>
+							</div>
+						</div>
+
+						<button
+							type="button"
+							class="ui-button send-button"
+							onclick={sendTransaction}
+							disabled={isSending || !recipient || !amount || amount <= 0 || amount > balance}
+						>
+							{isSending ? 'Sending...' : 'Send transaction'}
+						</button>
+					</div>
+				</section>
+
+				<section class="surface">
+					<div class="surface-pad">
+						<div class="section-head">
+							<div>
+								<p class="eyebrow">Transactions</p>
+								<h2 class="section-title">History</h2>
+							</div>
+						</div>
+
+						{#if !transactions || transactions.length === 0}
+							<p class="body-copy empty-copy">No activity yet.</p>
+						{:else}
+							<div class="table-shell">
+								<table class="ui-table">
+									<thead>
+										<tr>
+											<th>Type</th>
+											<th>Counterparty</th>
+											<th>Amount</th>
+											<th>Status</th>
+											<th>Block</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each transactions as tx (tx.id)}
+											{@const isSender = tx.senderId === user.id}
+											{@const isRecipient = tx.recipientId === user.id}
+											<tr>
+												<td>
+													{#if isSender && isRecipient}
+														<span class="status-pill status-pill--info">Self</span>
+													{:else if isSender}
+														<span class="status-pill status-pill--danger">Sent</span>
+													{:else if isRecipient}
+														<span class="status-pill status-pill--success">Received</span>
+													{/if}
+												</td>
+												<td>
+													{#if isSender && isRecipient}
+														{tx.recipientUsername}
+													{:else if isSender}
+														{tx.recipientUsername || '?'}
+													{:else}
+														{tx.senderUsername || 'System'}
+													{/if}
+												</td>
+												<td class:wallet-amount-forked={tx.status === 'forked'}>
+													{#if isSender && !isRecipient}
+														<span class="wallet-out">-{tx.amount}</span>
+													{:else if isRecipient && !isSender}
+														<span class="wallet-in">+{tx.amount}</span>
+													{:else}
+														<span>{tx.amount}</span>
+													{/if}
+												</td>
+												<td>
+													{#if tx.status === 'confirmed'}
+														<span class="status-pill status-pill--success">{tx.confirmations}× confirmed</span>
+													{:else if tx.status === 'pending'}
+														<span class="status-pill status-pill--warn">Pending</span>
+													{:else}
+														<span class="status-pill status-pill--danger">Forked</span>
+													{/if}
+												</td>
+												<td class="mono">
+													{#if tx.block}{tx.block.hash.substring(0, 8)}…{/if}
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
+						{/if}
+					</div>
+				</section>
+			</div>
+
+			{#if minedBlocks && minedBlocks.length > 0}
+				<section class="surface">
+					<div class="surface-pad">
+						<div class="section-head">
+							<div>
+								<p class="eyebrow">Mining</p>
+								<h2 class="section-title">Blocks mined</h2>
+							</div>
+						</div>
+
+						<div class="table-shell">
+							<table class="ui-table">
 								<thead>
-									<tr class="border-b border-cyan-800">
-										<th class="p-2 text-cyan-600 font-normal">Type</th>
-										<th class="p-2 text-cyan-600 font-normal">From/To</th>
-										<th class="p-2 text-cyan-600 font-normal">Amount</th>
-										<th class="p-2 text-cyan-600 font-normal">Status</th>
-										<th class="p-2 text-cyan-600 font-normal">Block</th>
+									<tr>
+										<th>Height</th>
+										<th>Time</th>
+										<th>Hash</th>
+										<th>Status</th>
+										<th>Reward</th>
 									</tr>
 								</thead>
 								<tbody>
-									{#each transactions as tx (tx.id)}
-										{@const isSender = tx.senderId === user.id}
-										{@const isRecipient = tx.recipientId === user.id}
-										<tr class="border-b border-cyan-900 hover:bg-gray-800">
-											<td class="p-2">
-												{#if isSender && isRecipient}
-													<span class="text-cyan-400 text-xs">Self</span>
-												{:else if isSender}
-													<span class="text-red-400">↑ Sent</span>
-												{:else if isRecipient}
-													<span class="text-green-400">↓ Recv</span>
-												{/if}
-											</td>
-											<td class="p-2 text-cyan-300">
-												{#if isSender && isRecipient}
-													{tx.recipientUsername}
-												{:else if isSender}
-													{tx.recipientUsername || "?"}
+									{#each minedBlocks as block (block.id)}
+										<tr>
+											<td>{block.height}</td>
+											<td>{timeAgo(block.minedAt)}</td>
+											<td class="mono">{block.hash.substring(0, 10)}…</td>
+											<td>
+												{#if block.inLongestChain}
+													<span class="status-pill status-pill--success">Main chain</span>
 												{:else}
-													{tx.senderUsername || "System"}
+													<span class="status-pill status-pill--danger">Side branch</span>
 												{/if}
 											</td>
-											<td class="p-2 {tx.status === 'forked' ? 'opacity-40 line-through' : ''}">
-												{#if isSender && !isRecipient}
-													<span class="text-red-400">-{tx.amount}</span>
-												{:else if isRecipient && !isSender}
-													<span class="text-green-400">+{tx.amount}</span>
+											<td>
+												{#if block.inLongestChain}
+													<span class="wallet-in">{block.reward} BTC</span>
 												{:else}
-													<span class="text-cyan-400">{tx.amount}</span>
+													<span class="wallet-amount-forked">—</span>
 												{/if}
-											</td>
-											<td class="p-2">
-												{#if tx.status === "confirmed"}
-													<span class="inline-flex items-center gap-1 rounded bg-green-950 border border-green-700 px-1.5 py-0.5 text-xs text-green-400">✓ {tx.confirmations}×</span>
-												{:else if tx.status === "pending"}
-													<span class="inline-flex items-center gap-1 rounded bg-amber-950 border border-amber-700 px-1.5 py-0.5 text-xs text-amber-300">⏳ pending</span>
-												{:else if tx.status === "forked"}
-													<span class="inline-flex items-center gap-1 rounded bg-red-950 border border-red-800 px-1.5 py-0.5 text-xs text-red-400">⚡ forked</span>
-												{/if}
-											</td>
-											<td class="p-2 text-cyan-600 font-mono text-xs">
-												{#if tx.block}{tx.block.hash.substring(0, 8)}…{/if}
 											</td>
 										</tr>
 									{/each}
 								</tbody>
 							</table>
 						</div>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Mined Blocks -->
-			{#if minedBlocks && minedBlocks.length > 0}
-				<div class="mt-6 cyberpunk-box rounded-lg p-4">
-					<h2 class="text-lg font-bold mb-3">Blocks Mined</h2>
-					<div class="overflow-x-auto">
-						<table class="w-full text-left text-sm">
-							<thead>
-								<tr class="border-b border-cyan-800">
-									<th class="p-2 text-cyan-600 font-normal">Height</th>
-									<th class="p-2 text-cyan-600 font-normal">Time</th>
-									<th class="p-2 text-cyan-600 font-normal">Hash</th>
-									<th class="p-2 text-cyan-600 font-normal">Status</th>
-									<th class="p-2 text-cyan-600 font-normal">Reward</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each minedBlocks as block (block.id)}
-									<tr class="border-b border-cyan-900 hover:bg-gray-800">
-										<td class="p-2 text-cyan-300">{block.height}</td>
-										<td class="p-2 text-cyan-600">{timeAgo(block.minedAt)}</td>
-										<td class="p-2 text-cyan-600 font-mono">{block.hash.substring(0, 10)}…</td>
-										<td class="p-2">
-											{#if block.inLongestChain}
-												<span class="text-green-400">main chain</span>
-											{:else}
-												<span class="text-red-400">side branch</span>
-											{/if}
-										</td>
-										<td class="p-2">
-											{#if block.inLongestChain}
-												<span class="text-green-400">{block.reward} BTC</span>
-											{:else}
-												<span class="text-red-400">—</span>
-											{/if}
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
 					</div>
-				</div>
+				</section>
 			{/if}
 		</div>
 	{/if}
 </div>
+
+<style>
+	.wallet-page,
+	.wallet-stack {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.page-loader {
+		max-width: 520px;
+		margin: 2rem auto 0;
+	}
+
+	.wallet-header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem 2rem;
+	}
+
+	.wallet-id {
+		flex-shrink: 0;
+	}
+
+	.wallet-name {
+		margin: 0.15rem 0 0;
+		font-size: clamp(1.3rem, 2.4vw, 2rem);
+		letter-spacing: -0.03em;
+	}
+
+	.wallet-balance-block {
+		flex: 1;
+	}
+
+	.wallet-balance__value {
+		margin-top: 0.3rem;
+		font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+		font-size: clamp(1.7rem, 3vw, 2.8rem);
+		font-weight: 700;
+		letter-spacing: -0.05em;
+		line-height: 1;
+	}
+
+	.wallet-actions-group {
+		display: flex;
+		gap: 0.7rem;
+		flex-shrink: 0;
+	}
+
+	.wallet-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+		gap: 1rem;
+	}
+
+	.section-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.recipient-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.recipient-pill {
+		padding: 0.45rem 0.8rem;
+		border: 1px solid rgba(103, 232, 249, 0.12);
+		border-radius: 999px;
+		background: rgba(8, 18, 28, 0.58);
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		cursor: pointer;
+		transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+	}
+
+	.recipient-pill:hover,
+	.recipient-pill.is-selected {
+		border-color: rgba(103, 232, 249, 0.32);
+		background: rgba(12, 28, 42, 0.82);
+		color: var(--text);
+	}
+
+	.send-button {
+		width: 100%;
+		margin-top: 1rem;
+	}
+
+	.empty-copy {
+		margin-top: 0.75rem;
+	}
+
+	.wallet-out {
+		color: #ffb6b6;
+	}
+
+	.wallet-in {
+		color: #c8ffd8;
+	}
+
+	.wallet-amount-forked {
+		opacity: 0.45;
+		text-decoration: line-through;
+	}
+
+	@media (max-width: 860px) {
+		.wallet-header,
+		.wallet-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.wallet-header {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+	}
+</style>
