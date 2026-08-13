@@ -98,6 +98,7 @@ async function createBlockchain(data) {
     minerId: satoshiUser.id,
     nonce: 0,
     minedAt: Date.now(),
+    height: 0,
     hash: '' // Will be calculated
   };
   

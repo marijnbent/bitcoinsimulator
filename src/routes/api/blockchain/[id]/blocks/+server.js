@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { blockchain, block, transaction, user } from '$lib/server/db/schema';
 import { eq, and, inArray, isNull, desc } from 'drizzle-orm';
 import { calculateBlockHash, isValidHash } from '$lib/utils/crypto.js';
+import { withComputedBlockHeights } from '$lib/utils/blockchain.js';
 
 // GET /api/blockchain/[id]/blocks - Get all blocks for a blockchain
 export async function GET({ params }) {
@@ -44,7 +45,7 @@ export async function GET({ params }) {
     }
 
     // Add transactions and miner usernames to blocks
-    const blocksWithTransactions = blocks.map(b => ({
+    const blocksWithTransactions = withComputedBlockHeights(blocks.map(b => ({
       ...b,
       minerUsername: b.minerId ? userMap[b.minerId] : null,
       transactions: (blockTransactions[b.id] || []).map(tx => ({
@@ -52,7 +53,7 @@ export async function GET({ params }) {
         senderUsername: tx.senderId ? userMap[tx.senderId] : null,
         recipientUsername: tx.recipientId ? userMap[tx.recipientId] : null
       }))
-    }));
+    })));
 
     return json(blocksWithTransactions);
   } catch (error) {
@@ -127,10 +128,16 @@ export async function POST({ params, request }) {
       return json({ error: 'Previous block not found' }, { status: 400 });
     }
 
+    const allBlocks = await db.select().from(block).where(eq(block.blockchainId, id));
+    const normalizedBlocks = withComputedBlockHeights(allBlocks);
+    const normalizedPreviousBlock = normalizedBlocks.find(
+      existingBlock => existingBlock.hash === previousBlock[0].hash
+    );
+
     const previousHash = previousBlock[0].hash;
 
-    // Calculate the height of the new block
-    const previousHeight = previousBlock[0].height !== null ? previousBlock[0].height : -1;
+    // Calculate the height of the new block from the normalized chain state.
+    const previousHeight = normalizedPreviousBlock?.height ?? -1;
     const newHeight = previousHeight + 1;
 
     // Check for existing block with same hash or height

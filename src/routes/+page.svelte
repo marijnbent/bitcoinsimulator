@@ -1,33 +1,27 @@
 <script>
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	
-	// State for blockchain selection
+
 	let publicBlockchain = null;
 	let connectBlockchainName = '';
 	let isLoading = true;
 	let error = null;
-	
-	// State for new blockchain creation
+
 	let newBlockchainName = '';
 	let leadingZeros = 4;
 	let blockReward = 3.125;
 	let isCreating = false;
 	let isConnecting = false;
-	let createdBlockchainId = null;
-	
-	// Fetch public blockchains on mount
+
 	onMount(async () => {
 		try {
 			const response = await fetch('/api/blockchain');
 			if (!response.ok) {
 				throw new Error(`Failed to fetch blockchains: ${response.statusText}`);
 			}
+
 			const blockchains = await response.json();
-			
-			// Find the Public blockchain
-			publicBlockchain = blockchains.find(b => b.name === 'Public');
-			
+			publicBlockchain = blockchains.find((blockchain) => blockchain.name === 'Public');
 			isLoading = false;
 		} catch (err) {
 			console.error('Error fetching blockchains:', err);
@@ -35,38 +29,40 @@
 			isLoading = false;
 		}
 	});
-	
-	// Handle public blockchain selection
+
 	function enterPublicBlockchain() {
 		if (publicBlockchain) {
 			goto(`/blockchain/${publicBlockchain.id}`);
-		} else {
-			error = 'Public blockchain not available';
+			return;
 		}
+
+		error = 'Public blockchain not available';
 	}
-	
-	// Handle connect to existing blockchain
+
 	async function connectToBlockchain() {
 		if (!connectBlockchainName) {
 			error = 'Blockchain name is required';
 			return;
 		}
-		
+
 		isConnecting = true;
-		
+
 		try {
-			const response = await fetch(`/api/blockchain/name/${encodeURIComponent(connectBlockchainName)}`);
+			const response = await fetch(
+				`/api/blockchain/name/${encodeURIComponent(connectBlockchainName)}`,
+			);
+
 			if (!response.ok) {
 				if (response.status === 404) {
-					throw new Error(`Blockchain not found. The blockchain with name "${connectBlockchainName}" may have been deleted or the database was reset.`);
-				} else {
-					throw new Error(`Error connecting to blockchain: ${response.statusText}`);
+					throw new Error(
+						`Blockchain not found. The blockchain with name "${connectBlockchainName}" may have been deleted or the database was reset.`,
+					);
 				}
+
+				throw new Error(`Error connecting to blockchain: ${response.statusText}`);
 			}
-			
+
 			const foundBlockchain = await response.json();
-			
-			// Navigate to the blockchain page
 			goto(`/blockchain/${foundBlockchain.id}`);
 		} catch (err) {
 			console.error('Error connecting to blockchain:', err);
@@ -74,17 +70,15 @@
 			isConnecting = false;
 		}
 	}
-	
-	// Handle create new blockchain
+
 	async function createNewBlockchain() {
 		if (!newBlockchainName) {
 			error = 'Blockchain name is required';
 			return;
 		}
-		
+
 		isCreating = true;
-		createdBlockchainId = null;
-		
+
 		try {
 			const response = await fetch('/api/blockchain', {
 				method: 'POST',
@@ -97,15 +91,12 @@
 					blockReward
 				})
 			});
-			
+
 			if (!response.ok) {
 				throw new Error(`Failed to create blockchain: ${response.statusText}`);
 			}
-			
+
 			const newBlockchain = await response.json();
-			createdBlockchainId = newBlockchain.id;
-			
-			// Redirect to the blockchain ID.
 			goto(`/blockchain/${newBlockchain.id}`);
 		} catch (err) {
 			console.error('Error creating blockchain:', err);
@@ -115,166 +106,230 @@
 	}
 </script>
 
-<div class="flex flex-col items-center justify-center py-12">
-	<h1 class="text-4xl font-bold mb-8 cyberpunk-glow">Bitcoin Simulator</h1>
-	
-	{#if error}
-		<div class="w-full max-w-md bg-red-900 border border-red-700 text-red-300 p-3 rounded mb-4">
-			{error}
-			<button 
-				aria-label="Dismiss error"
-				onclick={() => error = null} 
-				class="ml-2 text-red-300 hover:text-red-200"
-			>
-				✕
-			</button>
+<svelte:head>
+	<title>Bitcoin Simulator</title>
+</svelte:head>
+
+<div class="landing">
+	<div class="landing-copy">
+		<p class="landing-kicker">Bitcoin Simulator</p>
+		<h1 class="landing-title">Bitcoin, in motion.</h1>
+		<p class="landing-sub">Create transactions, mine blocks, watch forks unfold.</p>
+		<div class="landing-notes" aria-label="Highlights">
+			<p><span>Observe</span><strong>Blocks, mempool activity, and wallet changes in real time.</strong></p>
+			<p><span>Experiment</span><strong>Spin up a chain, tune difficulty, and test mining economics.</strong></p>
+			<p><span>Understand</span><strong>See why private-key guessing is the wrong mental model for attacks.</strong></p>
 		</div>
-	{/if}
-	
-	<div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
-		<!-- Left Column: Public and Connect -->
-		<div class="space-y-6">
-			<!-- Public Blockchain -->
-			<div class="p-6 cyberpunk-box rounded-lg">
-				<h2 class="text-2xl font-bold mb-4 text-center">Public Blockchain</h2>
-				
-				{#if isLoading}
-					<div class="text-center text-cyan-600 mb-4">Loading...</div>
-				{:else if !publicBlockchain}
-					<div class="text-center text-cyan-600 mb-4">Public blockchain not available</div>
-				{:else}
-					<div class="mb-4">
-						<p class="text-cyan-500">Name: <span class="text-cyan-300">{publicBlockchain.name}</span></p>
-						<p class="text-cyan-500">Difficulty: <span class="text-cyan-300">{publicBlockchain.leadingZeros} zeros</span></p>
-						<p class="text-cyan-500">Block Reward: <span class="text-cyan-300">{publicBlockchain.blockReward} BTC</span></p>
-					</div>
-				{/if}
-				
-				<button 
-					aria-label="Connect"
-					onclick={enterPublicBlockchain} 
-					disabled={isLoading || !publicBlockchain} 
-					class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
-				>
-					Enter Public Blockchain
-				</button>
+		<div class="landing-btns">
+			<button type="button" class="ui-button" onclick={enterPublicBlockchain} disabled={isLoading}>
+				{isLoading ? 'Loading...' : 'Open public chain'}
+			</button>
+			<a href="/osint" class="ui-button-secondary">OSINT desk</a>
+			<a href="/odds" class="ui-button-ghost">Private key odds</a>
+		</div>
+	</div>
+
+	<div class="landing-forms">
+		{#if error}
+			<div class="status-banner status-banner--danger">
+				<span>{error}</span>
+				<button type="button" class="ui-button-ghost" onclick={() => (error = null)}>Dismiss</button>
 			</div>
-			
-			<!-- Connect to Existing Blockchain -->
-			<div class="p-6 cyberpunk-box rounded-lg">
-				<h2 class="text-2xl font-bold mb-4 text-center">Connect to Blockchain</h2>
-				
-				<div class="mb-4">
-					<label for="blockchain-name" class="block text-sm text-cyan-500 mb-1">
-						Blockchain Name
-					</label>
-					<input 
-						id="blockchain-name"
-						type="text" 
-						bind:value={connectBlockchainName} 
-						placeholder="Enter blockchain name" 
-						class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-					/>
-				</div>
-				
-				<button 
-					aria-label="Connect"
-					onclick={connectToBlockchain} 
-					disabled={isConnecting || !connectBlockchainName} 
-					class="w-full py-2 px-4 bg-cyan-700 hover:bg-cyan-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors"
+		{/if}
+
+		<div class="surface">
+			<div class="surface-pad">
+				<p class="eyebrow">Connect to existing chain</p>
+				<input
+					id="blockchain-name"
+					type="text"
+					bind:value={connectBlockchainName}
+					placeholder="Chain name"
+					class="ui-input"
+				/>
+				<button
+					type="button"
+					class="ui-button-secondary form-btn"
+					onclick={connectToBlockchain}
+					disabled={isConnecting || !connectBlockchainName}
 				>
 					{isConnecting ? 'Connecting...' : 'Connect'}
 				</button>
 			</div>
 		</div>
-		
-		<!-- Right Column: Create New Blockchain -->
-		<div class="p-6 cyberpunk-box rounded-lg">
-			<h2 class="text-2xl font-bold mb-4 text-center">Create New Blockchain</h2>
-			
-			<div class="space-y-4 mb-4">
-				<div>
-					<label for="new-blockchain-name" class="block text-sm text-cyan-500 mb-1">
-						Blockchain Name
-					</label>
-				 	<input 
-						id="new-blockchain-name"
-						type="text" 
-						bind:value={newBlockchainName} 
-						placeholder="Enter a name for your blockchain" 
-						class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 placeholder-cyan-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-					/>
-				</div>
-				
-				<div>
-					<label for="leading-zeros" class="block text-sm text-cyan-500 mb-1">
-						Leading Zeros (Mining Difficulty)
-					</label>
-					<input 
-						id="leading-zeros"
-						type="range" 
-						bind:value={leadingZeros} 
-						min="1" 
-						max="16" 
-						class="w-full"
-					/>
-					<div class="flex justify-between text-xs text-cyan-600">
-						<span>1 (Easy)</span>
-						<span>{leadingZeros}</span>
-						<span>16 (Hard)</span>
+
+		<div class="surface">
+			<div class="surface-pad">
+				<p class="eyebrow">Create new chain</p>
+				<input
+					id="new-blockchain-name"
+					type="text"
+					bind:value={newBlockchainName}
+					placeholder="Chain name"
+					class="ui-input"
+				/>
+				<div class="create-row">
+					<div>
+						<label class="ui-label" for="leading-zeros">Difficulty</label>
+						<input
+							id="leading-zeros"
+							type="range"
+							bind:value={leadingZeros}
+							min="1"
+							max="16"
+							class="ui-range"
+						/>
+						<div class="range-meta">
+							<span>1</span><strong>{leadingZeros}</strong><span>16</span>
+						</div>
+					</div>
+					<div>
+						<label class="ui-label" for="block-reward">Block reward</label>
+						<input
+							id="block-reward"
+							type="number"
+							bind:value={blockReward}
+							min="0.1"
+							step="0.1"
+							class="ui-input"
+						/>
 					</div>
 				</div>
-				
-				<div>
-					<label for="block-reward" class="block text-sm text-cyan-500 mb-1">
-						Block Reward
-					</label>
-					<input 
-						id="block-reward"
-						type="number" 
-						bind:value={blockReward} 
-						min="0.1" 
-						step="0.1" 
-						class="w-full p-2 bg-gray-800 border border-cyan-700 rounded text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-					/>
-				</div>
-			</div>
-			
-			{#if createdBlockchainId}
-				
-			{:else}
-				<button 
-					aria-label="Create and connect"
-					onclick={createNewBlockchain} 
-					disabled={isCreating || !newBlockchainName} 
-					class="w-full py-2 px-4 bg-green-700 hover:bg-green-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+				<button
+					type="button"
+					class="ui-button form-btn"
+					onclick={createNewBlockchain}
+					disabled={isCreating || !newBlockchainName}
 				>
-					{isCreating ? 'Creating...' : 'Create & Enter'}
+					{isCreating ? 'Creating...' : 'Create & enter'}
 				</button>
-			{/if}
-			
-			<div class="mt-4 text-xs text-cyan-600">
-				<p>* A Genesis block with 10 BTC reward will be created automatically</p>
-				<p>* The blockchain will include a Satoshi user who mines the first block</p>
 			</div>
 		</div>
 	</div>
-
-	<div class="flex flex-col items-center justify-center py-12 max-w-2xl text-center">
-		<h1 class="text-4xl font-bold mb-8 cyberpunk-glow">About this Blockchain Simulator</h1>
-	<p>Dive into cryptocurrency with our Bitcoin Simulator. It's a hands-on way to learn how blockchain works. You can try out Bitcoin without risking real money. See how digital currencies operate and get real experience with decentralized transactions.</p>
-
-    <h2 class="text-2xl font-bold mt-6 mb-4 cyberpunk-glow">Blockchain Viewer: See the Network</h2>
-
-    <p>Watch the blockchain in action. Our viewer shows you how blocks connect and how the network agrees on transactions. You'll see simulated mining and how confirmations verify each transaction. This helps you understand how the blockchain keeps records secure.</p>
-
-    <h2 class="text-2xl font-bold mt-6 mb-4 cyberpunk-glow">Bitcoin Wallet: Practice Transactions</h2>
-
-    <p>Use our simulated Bitcoin wallet to send and receive Bitcoin. You can check transaction statuses and watch confirmations add up. This gives you practical experience with how Bitcoin transactions are processed and verified.</p>
-
-    <h2 class="text-2xl font-bold mt-6 mb-4 cyberpunk-glow">Learn Bitcoin: Hands-on Education</h2>
-
-    <p>Our Bitcoin Simulator is a simple way to learn about cryptocurrency and blockchain. You can experiment and see how everything works. Whether you're a student or just curious, this simulator lets you explore Bitcoin and blockchain easily.</p>
-
 </div>
-</div>
+
+<style>
+	.landing {
+		display: grid;
+		grid-template-columns: 1fr 1.15fr;
+		gap: clamp(2rem, 6vw, 6rem);
+		align-items: center;
+		min-height: calc(100svh - 8rem);
+		width: min(1280px, calc(100% - 1.5rem));
+		margin: 0 auto;
+		padding: 3rem 0;
+	}
+
+	.landing-title {
+		margin: 0;
+		max-width: 9ch;
+		font-size: clamp(2.8rem, 5.5vw, 5.2rem);
+		font-weight: 800;
+		letter-spacing: -0.055em;
+		line-height: 0.9;
+		color: var(--text);
+	}
+
+	.landing-kicker {
+		margin: 0 0 0.85rem;
+		color: var(--success);
+		font-family: 'SFMono-Regular', Consolas, monospace;
+		font-size: 0.74rem;
+		font-weight: 700;
+		letter-spacing: 0.26em;
+		text-transform: uppercase;
+	}
+
+	.landing-sub {
+		max-width: 30rem;
+		margin: 1rem 0 0;
+		color: var(--text-muted);
+		font-size: 1.08rem;
+		line-height: 1.55;
+	}
+
+	.landing-notes {
+		display: grid;
+		gap: 0.85rem;
+		margin-top: 1.75rem;
+		padding-top: 1.15rem;
+		border-top: 1px solid rgba(103, 232, 249, 0.1);
+	}
+
+	.landing-notes p {
+		display: grid;
+		gap: 0.22rem;
+		margin: 0;
+	}
+
+	.landing-notes span {
+		color: var(--text-faint);
+		font-family: 'SFMono-Regular', Consolas, monospace;
+		font-size: 0.76rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+	}
+
+	.landing-notes strong {
+		max-width: 32rem;
+		color: var(--text);
+		font-size: 0.98rem;
+		font-weight: 600;
+		line-height: 1.45;
+	}
+
+	.landing-btns {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin-top: 1.6rem;
+	}
+
+	.landing-forms {
+		display: grid;
+		gap: 0.75rem;
+	}
+
+	.form-btn {
+		width: 100%;
+		margin-top: 0.9rem;
+	}
+
+	.create-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+		margin-top: 1rem;
+	}
+
+	.range-meta {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.76rem;
+		color: var(--text-faint);
+		font-family: 'SFMono-Regular', Consolas, monospace;
+		margin-top: 0.35rem;
+	}
+
+	.range-meta strong {
+		color: var(--text);
+	}
+
+	@media (max-width: 860px) {
+		.landing {
+			grid-template-columns: 1fr;
+			min-height: auto;
+			padding: 2rem 0;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.landing {
+			width: calc(100% - 1rem);
+		}
+
+		.landing-btns {
+			flex-direction: column;
+		}
+	}
+</style>
